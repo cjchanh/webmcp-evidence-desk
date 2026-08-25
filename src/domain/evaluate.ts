@@ -207,7 +207,7 @@ export function evaluateClaim(
         }
       ]
       const asserted = attestation
-        ? findDatedSpan(attestation, /inspection\s+(?:was\s+)?completed[^\n]{0,80}?\d{4}-\d{2}-\d{2}/i)
+        ? findDatedSpan(attestation, /inspection\b[^.\n]{0,120}?\bcompleted\b[^.\n]{0,40}?\d{4}-\d{2}-\d{2}/i)
         : null
       if (attestation && asserted && asserted.date <= acceptanceHit.date) {
         reasons.push({
