@@ -114,3 +114,26 @@ await document.modelContext.registerTool({
 All four tools (`search_evidence`, `inspect_exhibit`, `evaluate_claim`,
 `update_caseboard`) are registered in `src/webmcp/register.ts` with per-tool
 error isolation and bounded JSON-string outputs.
+
+> The snippet above is the illustrative core. Real definitions also carry a
+> `title`, `annotations` (including `untrustedContentHint`), abort-signal
+> threading, and bounded JSON-string outputs — see `src/webmcp/register.ts`.
+
+## For the judge
+
+1. **Copy judge prompt** — pastes a self-contained review prompt; use it with an
+   agent that can see this page (ChatGPT desktop in-app browser, or Chrome 149+
+   with WebMCP enabled). Expect tool calls to appear in the live log.
+2. **Run simulated review** — same domain flow, clearly labeled SIMULATED; for
+   browsers/contexts without WebMCP.
+3. **Caseboard** — the agent may ADD exhibits only. Pin / Remove / Reject are
+   human-exclusive adjudication controls.
+4. **SEAL RECEIPT** — signs a local session receipt (ephemeral Ed25519 key)
+   over the accepted evidence hashes and tool log. Refuses to seal before a
+   verdict exists.
+5. **Verify this receipt** — re-checks internal signature and anchors every
+   accepted hash against the shipped signed manifest.
+6. Tamper anything and verification fails: text flips quarantine one exhibit;
+   structural flips break the manifest signature and quarantine everything.
+
+No network calls. Synthetic data only.

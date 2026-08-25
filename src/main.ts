@@ -191,6 +191,13 @@ let simRunning = false
 
 async function runSimulated(): Promise<void> {
   if (simRunning) return
+  // Cycle-4: refuse a pre-boot or empty-corpus run — reviewing zero exhibits
+  // produces a misleading INSUFFICIENT that reads as broken.
+  if (state.verified.length === 0) {
+    showSealStatus('EVIDENCE STILL VERIFYING — try the simulated review in a moment.')
+    log('ERR', 'simulated review refused: evidence not verified yet')
+    return
+  }
   simRunning = true
   els.simRibbon.hidden = false
   try {
@@ -292,7 +299,7 @@ async function sealReceipt(): Promise<void> {
     const envelope = await buildSealedReceipt(
       {
         sealedAt: new Date().toISOString(),
-        sessionId: crypto.randomUUID(),
+        sessionId: sessionId(),
         claimText: HERO_CLAIM,
         verdict: sealedVerdict,
         acceptedEvidence: accepted,
@@ -339,11 +346,12 @@ async function verifyLastReceipt(): Promise<void> {
   if (!state.lastReceipt) return
   els.receiptVerifyStatus.textContent = 'VERIFYING RECEIPT…'
   const result = await verifySealedReceiptEnvelope(state.lastReceipt, {
-    manifestExhibits: MANIFEST.exhibits
+    manifestExhibits: MANIFEST.exhibits,
+    expectedManifestPublicKey: MANIFEST.publicKey
   })
   if (result.signatureValid && result.hashesAnchoredInManifest) {
     els.receiptVerifyStatus.textContent =
-      'RECEIPT VERIFY OK — signature valid; accepted hashes anchored in signed manifest'
+      'RECEIPT VERIFY PASS — internal signature valid; accepted hashes anchored in the shipped signed manifest'
   } else {
     els.receiptVerifyStatus.textContent = `RECEIPT VERIFY FAILED — ${result.problems.join('; ') || 'signature invalid'}`
   }
@@ -420,6 +428,9 @@ async function bootInner(): Promise<void> {
 
   renderGrid()
 
+  // Sim button appears only after verification lands (cycle-4 ordering fix).
+  els.simInline.hidden = false
+
   // WebMCP progressive enhancement. The registration signal doubles as the
   // page-lifetime unregister path (spec §5) — exercised, not just supported.
   const bootController = new AbortController()
@@ -469,9 +480,18 @@ els.bannerSim.addEventListener('click', () => void runSimulated())
 els.simInline.addEventListener('click', () => void runSimulated())
 els.simRibbon.addEventListener('click', () => {})
 
-// Simulated lane is reachable even when WebMCP IS present (cycle-1 UX hardening):
-// a judge whose agent path fails still gets the full review flow, honestly labeled.
-els.simInline.hidden = false
+// Simulated lane is reachable even when WebMCP IS present (cycle-1 UX hardening),
+// but only AFTER boot verification lands (cycle-4): a mid-boot run would review
+// zero exhibits and read as broken.
+function sessionId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  // Fallback for engines without randomUUID (older WebKit / non-secure ctx).
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 
 els.modalBackdrop.addEventListener('click', (e) => {
   if (e.target === els.modalBackdrop) closeModal()

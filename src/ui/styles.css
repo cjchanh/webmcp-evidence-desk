@@ -399,6 +399,13 @@ button.big {
   .claim-actions button {
     width: 100%;
   }
+  .modal-actions {
+    flex-wrap: wrap;
+    flex-direction: column;
+  }
+  .modal-actions button {
+    width: 100%;
+  }
   .exhibit-grid {
     grid-template-columns: 1fr;
   }

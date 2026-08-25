@@ -161,6 +161,12 @@ export async function verifySealedReceiptEnvelope(
       id: string
       spans: ReadonlyArray<{ sha256: string }>
     }>
+    /**
+     * Cycle-4: when provided, the receipt's chained manifest public key must
+     * match — defeats self-consistent forgeries that swap session keys while
+     * copying an authentic-looking manifest reference.
+     */
+    expectedManifestPublicKey?: string
   }
 ): Promise<ReceiptVerificationResult> {
   throwIfAborted(opts?.signal)
@@ -212,6 +218,14 @@ export async function verifySealedReceiptEnvelope(
   // supplies the authentic exhibit list.
   const receipt = env.receipt as {
     accepted_evidence?: Array<{ exhibit_id: string; span_sha256s?: string[] }>
+    manifest_public_key?: string
+  }
+  if (
+    opts?.expectedManifestPublicKey &&
+    receipt.manifest_public_key !== opts.expectedManifestPublicKey
+  ) {
+    result.hashesAnchoredInManifest = false
+    problems.push('receipt chains to a manifest public key that is not the shipped one')
   }
   if (opts?.manifestExhibits && Array.isArray(receipt.accepted_evidence)) {
     const byId = new Map(opts.manifestExhibits.map((m) => [m.id, m]))
@@ -220,18 +234,20 @@ export async function verifySealedReceiptEnvelope(
       const manifestExhibit = byId.get(item.exhibit_id)
       if (!manifestExhibit) {
         anchored = false
-        problems.push(`accepted exhibit ${item.exhibit_id} not present in signed manifest`)
+        problems.push(`accepted exhibit ${String(item.exhibit_id).slice(0, 64)} not present in signed manifest`)
         continue
       }
       const manifestHashes = new Set(manifestExhibit.spans.map((s) => s.sha256))
       for (const h of item.span_sha256s ?? []) {
         if (!manifestHashes.has(h)) {
           anchored = false
-          problems.push(`accepted hash ${h.slice(0, 12)}… not in manifest spans for ${item.exhibit_id}`)
+          problems.push(`accepted hash ${h.slice(0, 12)}… not in manifest spans for ${String(item.exhibit_id).slice(0, 64)}`)
         }
       }
     }
-    result.hashesAnchoredInManifest = anchored
+    if (result.hashesAnchoredInManifest !== false) {
+      result.hashesAnchoredInManifest = anchored
+    }
   }
 
   return result
