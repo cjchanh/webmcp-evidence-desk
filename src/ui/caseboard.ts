@@ -83,13 +83,25 @@ export function renderExhibitGrid(
     const preview = el('p', 'exhibit-preview', exhibit.spans[0]?.text ?? '')
     card.appendChild(preview)
 
-    if (!quarantined && entry) {
+    // Cycle-1 UX hardening: controls are ALWAYS rendered on verified cards so
+    // the board never reads as inert; before the agent proposes anything they
+    // are disabled with an explanation instead of absent.
+    if (!quarantined) {
       const controls = el('div', 'control-row')
-      controls.append(
-        btn('PIN', () => cb.onPin(exhibit.id)),
-        btn('REMOVE', () => cb.onRemove(exhibit.id)),
-        btn('REJECT', () => cb.onReject(exhibit.id))
-      )
+      const awaiting = entry === undefined
+      for (const [label, action] of [
+        ['PIN', cb.onPin],
+        ['REMOVE', cb.onRemove],
+        ['REJECT', cb.onReject]
+      ] as const) {
+        const b = btn(label, () => action(exhibit.id))
+        if (awaiting) {
+          b.disabled = true
+          b.title = 'Awaiting agent proposal — run the review to enable adjudication'
+          b.setAttribute('aria-disabled', 'true')
+        }
+        controls.append(b)
+      }
       card.appendChild(controls)
     }
 

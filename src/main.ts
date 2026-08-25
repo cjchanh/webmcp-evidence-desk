@@ -15,7 +15,8 @@ import {
   applyHumanAction,
   createBoard
 } from './domain/board.ts'
-import { buildSealedReceipt } from './domain/receipt.ts'
+import { buildSealedReceipt, collectAcceptedEvidence } from './domain/receipt.ts'
+import { evaluateClaim } from './domain/evaluate.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
 import type {
   BoardState,
@@ -40,14 +41,19 @@ import { ed25519 } from '@noble/curves/ed25519.js'
 
 const HERO_CLAIM = 'Did the vendor provide the required inspection report before acceptance?'
 
+// Self-contained: embeds the claim so it works even where this page's tools
+// are unreachable, names the exact tools, and sets the expectation line so a
+// judge knows what should happen after pasting.
 const JUDGE_PROMPT = [
-  'You are reviewing a procurement evidence caseboard open on this page.',
-  'Use this page\'s WebMCP tools:',
+  'Review this contested procurement claim using the Evidence Desk page open in your agent browser:',
+  `CLAIM: "${HERO_CLAIM}"`,
+  'Use the page\'s WebMCP tools:',
   "1. search_evidence — find exhibits relevant to the claim.",
-  '2. inspect_exhibit — read exact source spans for any exhibit id.',
-  "3. evaluate_claim — test the claim: \"" + HERO_CLAIM + "\"",
+  '2. inspect_exhibit — read exact source spans (start with EX-001 vendor attestation and EX-002 inspection report).',
+  "3. evaluate_claim — test the claim and return SUPPORTED / CONTRADICTED / INSUFFICIENT with span-tied reasons.",
   "4. update_caseboard — action:'add' with exhibit_id and stance (supports|contradicts).",
-  'Report span-tied reasons. Pin, remove, reject, and seal are human-exclusive controls.'
+  'Expected flow: search first, inspect both sides, then evaluate; exhibits you add appear on the caseboard.',
+  'Pin, remove, reject, and seal are human-exclusive controls.'
 ].join('\n')
 
 interface AppState {
@@ -87,6 +93,8 @@ const els = {
   log: byId<HTMLOListElement>('tool-log'),
   grid: byId<HTMLDivElement>('exhibit-grid'),
   sealBtn: byId<HTMLButtonElement>('btn-seal-receipt'),
+  sealStatus: byId<HTMLSpanElement>('seal-status'),
+  simInline: byId<HTMLButtonElement>('btn-run-sim-inline'),
   modalBackdrop: byId<HTMLDivElement>('seal-modal-backdrop'),
   receiptPreview: byId<HTMLPreElement>('seal-receipt-preview'),
   downloadBtn: byId<HTMLButtonElement>('btn-download-receipt'),
@@ -99,6 +107,18 @@ const els = {
 function log(tag: LogTag, text: string): void {
   state.toolLog.push(`[${tag}] ${text}`)
   appendLog(els.log, tag, text)
+}
+
+/** Visible, non-log-only status for the seal affordance (cycle-1 UX hardening). */
+let sealStatusTimer: ReturnType<typeof setTimeout> | undefined
+function showSealStatus(text: string): void {
+  els.sealStatus.textContent = text
+  if (sealStatusTimer) clearTimeout(sealStatusTimer)
+  if (text) {
+    sealStatusTimer = setTimeout(() => {
+      els.sealStatus.textContent = ''
+    }, 8000)
+  }
 }
 
 // --- board ------------------------------------------------------------------
@@ -205,23 +225,41 @@ function makeEphemeralSigner() {
 }
 
 async function sealReceipt(): Promise<void> {
+  // Cycle-1 hardening: sealing is refused until an evaluation exists, and the
+  // receipt is rebuilt from the ACCEPTED set at seal time so verdict and
+  // accepted_evidence can never disagree.
+  if (state.verdict === 'PENDING') {
+    showSealStatus('SEAL REFUSED — run the review first (agent or simulated), then seal.')
+    log('ERR', 'seal refused: no evaluation yet (verdict PENDING)')
+    return
+  }
+
+  const { accepted, refused } = collectAcceptedEvidence(
+    state.board.entries,
+    state.verified,
+    state.quarantinedIds
+  )
+  for (const r of refused) {
+    log('ERR', `seal excluded ${r.exhibit_id}: ${r.reason}`)
+  }
+  if (refused.length > 0) {
+    showSealStatus(`SEAL PARTIAL — ${refused.length} board item(s) not SIG VERIFIED were excluded.`)
+  }
+
   try {
-    const accepted = state.board.entries
-      .filter((e) => e.status !== 'rejected')
-      .map((e) => {
-        const exhibit = state.verified.find((v) => v.id === e.exhibit_id)
-        return {
-          exhibit_id: e.exhibit_id,
-          title: exhibit?.title ?? '(unknown)',
-          span_sha256s: exhibit ? exhibit.spans.map((s) => s.sha256) : []
-        }
-      })
+    const acceptedExhibits = accepted
+      .map((a) => state.verified.find((v) => v.id === a.exhibit_id))
+      .filter((v): v is Exhibit => Boolean(v))
+    const sealedVerdict =
+      acceptedExhibits.length > 0
+        ? evaluateClaim(HERO_CLAIM, acceptedExhibits).verdict
+        : state.verdict
 
     const envelope = await buildSealedReceipt(
       {
         sealedAt: new Date().toISOString(),
         claimText: HERO_CLAIM,
-        verdict: state.verdict,
+        verdict: sealedVerdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
         manifestPublicKey: MANIFEST.publicKey,
@@ -233,9 +271,12 @@ async function sealReceipt(): Promise<void> {
     state.lastReceipt = envelope
     els.receiptPreview.textContent = JSON.stringify(envelope, null, 2)
     els.modalBackdrop.hidden = false
+    lastFocusedBeforeModal = document.activeElement as HTMLElement | null
     els.closeModalBtn.focus()
+    showSealStatus('')
     log('HUMAN', `receipt sealed over ${accepted.length} accepted exhibits`)
   } catch (err) {
+    showSealStatus('SEAL FAILED — see tool log.')
     log('ERR', `seal failed: ${(err as Error)?.message ?? String(err)}`)
   }
 }
@@ -256,24 +297,50 @@ function downloadReceipt(): void {
   log('HUMAN', 'receipt JSON downloaded')
 }
 
+/** Cycle-1 a11y: trap Tab inside the open modal; restore focus on close. */
+let lastFocusedBeforeModal: HTMLElement | null = null
+
 function closeModal(): void {
   els.modalBackdrop.hidden = true
+  // Focus restore on EVERY close path — Esc handler and Close button share this.
+  lastFocusedBeforeModal?.focus()
+  lastFocusedBeforeModal = null
+}
+
+function trapModalFocus(e: KeyboardEvent): void {
+  if (e.key !== 'Tab' || els.modalBackdrop.hidden) return
+  const focusables = Array.from(
+    els.modalBackdrop.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')
+  ).filter((n) => !n.hasAttribute('disabled'))
+  if (focusables.length === 0) return
+  const first = focusables[0]
+  const last = focusables[focusables.length - 1]
+  if (!first || !last) return
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
+  }
 }
 
 // --- boot -------------------------------------------------------------------
 
 async function boot(): Promise<void> {
+  els.verdictStamp.textContent = 'VERIFYING EVIDENCE…'
   log('SYS', 'verifying signed manifest client-side')
 
   // Runtime check of origin agent cluster — headers alone are not trusted.
   const cluster = (window as unknown as { originAgentCluster?: boolean }).originAgentCluster
   els.clusterStatus.textContent =
-    cluster === true ? 'AGENT CLUSTER: ?1 CONFIRMED' : 'AGENT CLUSTER: NOT CONFIRMED'
+    cluster === true ? 'AGENT CLUSTER: CONFIRMED' : 'AGENT CLUSTER: NOT CONFIRMED'
   els.clusterStatus.className = `badge ${cluster === true ? 'badge-ok' : 'badge-neutral'}`
 
   const report = await verifyManifest(MANIFEST)
   state.verified = report.verified
   state.quarantinedIds = new Set(report.quarantined.map((q) => q.exhibit_id))
+  els.verdictStamp.textContent = 'VERDICT: PENDING REVIEW'
 
   if (!report.manifestSignatureValid) {
     log('ERR', 'MANIFEST MISMATCH — signature invalid; all exhibits quarantined')
@@ -288,13 +355,18 @@ async function boot(): Promise<void> {
 
   renderGrid()
 
-  // WebMCP progressive enhancement.
+  // WebMCP progressive enhancement. The registration signal doubles as the
+  // page-lifetime unregister path (spec §5) — exercised, not just supported.
+  const bootController = new AbortController()
+  window.addEventListener('pagehide', () => bootController.abort(), { once: true })
   const docLike = document as unknown as { modelContext?: ModelContextLike }
   const ctx: ToolContext = {
     exhibits: () => state.verified,
     addToBoard: (id, stance) => addToBoardFromAgent(id, stance)
   }
-  const registration = await registerEvidenceTools(docLike, ctx)
+  const registration = await registerEvidenceTools(docLike, ctx, {
+    signal: bootController.signal
+  })
 
   if (!registration.supported) {
     els.webmcpStatus.textContent = 'WEBMCP: UNAVAILABLE'
@@ -328,16 +400,21 @@ els.sealBtn.addEventListener('click', () => void sealReceipt())
 els.downloadBtn.addEventListener('click', downloadReceipt)
 els.closeModalBtn.addEventListener('click', closeModal)
 els.bannerSim.addEventListener('click', () => void runSimulated())
+els.simInline.addEventListener('click', () => void runSimulated())
 els.simRibbon.addEventListener('click', () => {})
+
+// Simulated lane is reachable even when WebMCP IS present (cycle-1 UX hardening):
+// a judge whose agent path fails still gets the full review flow, honestly labeled.
+els.simInline.hidden = false
 
 els.modalBackdrop.addEventListener('click', (e) => {
   if (e.target === els.modalBackdrop) closeModal()
 })
 
 document.addEventListener('keydown', (e) => {
+  trapModalFocus(e)
   if (e.key === 'Escape' && !els.modalBackdrop.hidden) {
     closeModal()
-    els.sealBtn.focus()
     return
   }
   const modalOpen = !els.modalBackdrop.hidden

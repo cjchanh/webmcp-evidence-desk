@@ -196,8 +196,11 @@ export function buildToolDefs(ctx: ToolContext): WebMcpToolDefinition[] {
     throwIfAborted(options?.signal)
     const obj = asRecord(input)
     if (obj.action !== 'add') {
+      // Cap interpolated values: tool inputs are untrusted and error strings
+      // become tool outputs — never let an oversized input escape bounded paths.
+      const shown = String(obj.action).slice(0, 64)
       throw new TypeError(
-        `invalid params: agents may only add; '${String(obj.action)}' is a human-exclusive control`
+        `invalid params: agents may only add; '${shown}' is a human-exclusive control`
       )
     }
     const exhibitId = reqString(obj, 'exhibit_id', 64)

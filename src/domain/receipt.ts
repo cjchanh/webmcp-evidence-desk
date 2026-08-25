@@ -28,6 +28,40 @@ export interface AcceptedEvidenceItem {
   span_sha256s: string[]
 }
 
+/**
+ * Seal-time gate (cycle-1 hardening): only exhibits that are PRESENT in the
+ * verified set may enter a sealed receipt. Unknown or quarantined exhibit ids
+ * are refused and reported — a receipt can never claim acceptance of evidence
+ * that was never SIG VERIFIED.
+ */
+export function collectAcceptedEvidence(
+  boardEntries: ReadonlyArray<{ exhibit_id: string; status: string }>,
+  verifiedExhibits: ReadonlyArray<{ id: string; title: string; spans: ReadonlyArray<{ sha256: string }> }>,
+  quarantinedIds: ReadonlySet<string>
+): { accepted: AcceptedEvidenceItem[]; refused: Array<{ exhibit_id: string; reason: string }> } {
+  const byId = new Map(verifiedExhibits.map((v) => [v.id, v]))
+  const accepted: AcceptedEvidenceItem[] = []
+  const refused: Array<{ exhibit_id: string; reason: string }> = []
+  for (const entry of boardEntries) {
+    if (entry.status === 'rejected') continue // human rejection excludes from receipt
+    if (quarantinedIds.has(entry.exhibit_id)) {
+      refused.push({ exhibit_id: entry.exhibit_id, reason: 'quarantined' })
+      continue
+    }
+    const exhibit = byId.get(entry.exhibit_id)
+    if (!exhibit) {
+      refused.push({ exhibit_id: entry.exhibit_id, reason: 'not_in_verified_set' })
+      continue
+    }
+    accepted.push({
+      exhibit_id: exhibit.id,
+      title: exhibit.title,
+      span_sha256s: exhibit.spans.map((s) => s.sha256)
+    })
+  }
+  return { accepted, refused }
+}
+
 export interface SealedReceiptInput {
   sealedAt: string
   claimText: string

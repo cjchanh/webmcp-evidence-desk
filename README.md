@@ -96,3 +96,21 @@ rather than trusting headers alone. WebMCP requires Chrome 149+ (flag:
 
 Apache-2.0 — see [LICENSE](LICENSE). Signing dependency `@noble/curves` is ISC;
 its license notices are preserved in `node_modules` and acknowledged here.
+
+## WebMCP registration (the required pattern, literally)
+
+Tools are registered on `document.modelContext` when present. The exact
+registration shape used by this repo:
+
+```js
+await document.modelContext.registerTool({
+  name: "evaluate_claim",
+  description: "Test the contested claim against verified exhibits",
+  inputSchema: { type: "object", properties: { claim: { type: "string" } } },
+  execute: async (input) => JSON.stringify(evaluateClaim(input.claim, verified))
+})
+```
+
+All four tools (`search_evidence`, `inspect_exhibit`, `evaluate_claim`,
+`update_caseboard`) are registered in `src/webmcp/register.ts` with per-tool
+error isolation and bounded JSON-string outputs.

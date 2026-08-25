@@ -36,6 +36,7 @@
       </blockquote>
       <div class="claim-actions">
         <button id="btn-copy-judge-prompt" type="button" class="primary">Copy judge prompt</button>
+        <button id="btn-run-sim-inline" type="button" hidden>Run simulated review</button>
         <span id="copy-feedback" class="feedback" role="status"></span>
       </div>
       <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
@@ -57,6 +58,7 @@
 
     <section class="card seal-card">
       <button id="btn-seal-receipt" type="button" class="primary big">SEAL RECEIPT</button>
+      <span id="seal-status" class="feedback" role="alert"></span>
       <span class="hint">Seals a local session receipt referencing the accepted evidence hashes. No network. Tamper-evident, not tamper-proof.</span>
     </section>
   </main>

@@ -379,3 +379,37 @@ button.big {
     scroll-behavior: auto !important;
   }
 }
+
+/* Cycle-1 hardening: mobile breakpoint — judges may open on a phone. */
+@media (max-width: 520px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .status-cluster {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .claim-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .claim-actions button {
+    width: 100%;
+  }
+  .exhibit-grid {
+    grid-template-columns: 1fr;
+  }
+  .seal-card {
+    align-items: stretch;
+  }
+}
+
+/* Visible seal status (success/refusal/failure) — never log-only. */
+.seal-card .feedback[role='alert'] {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+}

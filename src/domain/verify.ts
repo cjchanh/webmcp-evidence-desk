@@ -48,8 +48,21 @@ export async function verifyManifest(
     return allQuarantined('malformed manifest key material')
   }
 
+  // Cycle-1 hardening: the format/algorithm fields are part of the artifact
+  // contract — refuse anything this verifier was not built to check.
+  if (manifest.format !== 'evidence-desk-manifest/v1' || manifest.algorithm !== 'ed25519') {
+    return allQuarantined('unsupported manifest format or algorithm')
+  }
+
   const payload = manifestSigningPayload(manifest.exhibits)
-  const signatureValid = ed25519.verify(signature, payload, publicKey)
+  // Defense-in-depth: a crypto-library throw must degrade to quarantine-all,
+  // never crash boot into an unverified-accepting state.
+  let signatureValid = false
+  try {
+    signatureValid = ed25519.verify(signature, payload, publicKey)
+  } catch {
+    signatureValid = false
+  }
   if (!signatureValid) {
     return allQuarantined('manifest signature invalid')
   }
