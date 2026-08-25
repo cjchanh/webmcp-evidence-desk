@@ -71,7 +71,7 @@ describe('receipt honesty (cycle-3)', () => {
 
 describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
   it('verifies an untouched envelope and anchors hashes to the manifest', async () => {
-    const envelope = await buildSealedReceipt(BASE_INPUT, signer(9))
+    const envelope = await buildSealedReceipt(BASE_INPUT, signer())
     const result = await verifySealedReceiptEnvelope(envelope)
     expect(result.signatureValid).toBe(true)
 
@@ -86,7 +86,7 @@ describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
   })
 
   it('detects a tampered verdict', async () => {
-    const envelope = await buildSealedReceipt(BASE_INPUT, signer(9))
+    const envelope = await buildSealedReceipt(BASE_INPUT, signer())
     const tampered = JSON.parse(JSON.stringify(envelope))
     tampered.receipt.verdict = 'SUPPORTED'
     const result = await verifySealedReceiptEnvelope(tampered)
