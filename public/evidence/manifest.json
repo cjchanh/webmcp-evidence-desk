@@ -1,0 +1,231 @@
+{
+  "format": "evidence-desk-manifest/v1",
+  "algorithm": "ed25519",
+  "exhibits": [
+    {
+      "id": "EX-001",
+      "title": "Vendor Attestation Letter - Inspection Completion",
+      "spans": [
+        {
+          "span_id": "EX-001-1",
+          "text": "MERIDIAN COMPONENTS LTD - Quality Directorate. Attestation Letter ATL-2214. To: Northgate Systems Group Program Office. Re: Halcyon Avionics Enclosure Assembly, Purchase Order PO-88412.",
+          "sha256": "3142e92c6fb0e03d2c2ee0cb5d71871a61df06453edbec8a6ad0662d65dcc43b"
+        },
+        {
+          "span_id": "EX-001-2",
+          "text": "We hereby attest that the required final inspection for Lot HX-17 was completed on 2026-03-10, prior to acceptance, and that all units conform to Specification Sheet SPS-77 Rev C.",
+          "sha256": "9b25a6aa86e6a577ade8daff0a71283e831c737e129e52531d4e2bfa709916c4"
+        },
+        {
+          "span_id": "EX-001-3",
+          "text": "This attestation is issued in support of the handoff packet delivered to the customer program office.",
+          "sha256": "04b9acff28fba311b24628cadfaf278005ffba3cc0f2f0d72d1c441ac7163507"
+        }
+      ]
+    },
+    {
+      "id": "EX-002",
+      "title": "Inspection Report IR-2219 - Final Electrical and Mechanical Inspection",
+      "spans": [
+        {
+          "span_id": "EX-002-1",
+          "text": "MERIDIAN COMPONENTS LTD - Inspection Report IR-2219. Lot HX-17, Halcyon Avionics Enclosure Assembly. Inspector of record: K. Osei, Certified Quality Inspector CQI-4471.",
+          "sha256": "5b810678a157f02f38005d290c7703708c4bb72b3f159dfa9873db1117adc8a6"
+        },
+        {
+          "span_id": "EX-002-2",
+          "text": "All electrical continuity and mechanical torque checks were performed on 2026-03-19 at the Meridian Fab 2 facility. Two units (S/N HX17-0088, HX17-0103) required rework of connector seating prior to pass.",
+          "sha256": "a8b52c674aa01d76eb42cfa292e2c68c043fb38d57292975ef7859bf464144cb"
+        },
+        {
+          "span_id": "EX-002-3",
+          "text": "Report approved and released by Quality Manager on 2026-03-20. Distribution: Program Office, Records Retention.",
+          "sha256": "dcccd42c3d79f00d008f361b9bcf76d70c647423176b88f734ffc40ccb91936d"
+        }
+      ]
+    },
+    {
+      "id": "EX-003",
+      "title": "Acceptance Certificate AC-1147",
+      "spans": [
+        {
+          "span_id": "EX-003-1",
+          "text": "NORTHGATE SYSTEMS GROUP - Acceptance Certificate AC-1147. Contract line: Halcyon Avionics Enclosure Assembly, Lot HX-17, Purchase Order PO-88412.",
+          "sha256": "79d07bfb8425796a453d7360f1245469752d6df2426d2b118d59c682e23f4459"
+        },
+        {
+          "span_id": "EX-003-2",
+          "text": "The customer accepted Lot HX-17 into service on 2026-03-14 following receiving verification at Dock 4. Acceptance covers 24 units, serials HX17-0081 through HX17-0104.",
+          "sha256": "ad9c6a59c865b664f488e454e2d29b9d400da63c83a65b6236777df29ac761a5"
+        },
+        {
+          "span_id": "EX-003-3",
+          "text": "Signed by receiving officer R. Calder. Certificate recorded in the acceptance register on 2026-03-16.",
+          "sha256": "2cf21ff8fe0e698e8b0b6bcb420dee7957c802744e449df2ada0359614a569fb"
+        }
+      ]
+    },
+    {
+      "id": "EX-004",
+      "title": "Delivery Log DL-3092",
+      "spans": [
+        {
+          "span_id": "EX-004-1",
+          "text": "FREIGHT RECEIVING LOG DL-3092 - Northgate Dock 4. Shipment MS-77102 from Meridian Components Ltd received 2026-03-11 at 09:40.",
+          "sha256": "e3a29b8cc69e7aa78f995cb457ae9e7ff63a485573ce869db3840a6ca4dabf6f"
+        },
+        {
+          "span_id": "EX-004-2",
+          "text": "Contents: 2 crates, 24 enclosures, Lot HX-17 against PO-88412. No visible transit damage. Crates routed to receiving verification queue.",
+          "sha256": "add4b8d1cf78800c204d7609838308295f913b826eba12838930b113e609a173"
+        }
+      ]
+    },
+    {
+      "id": "EX-005",
+      "title": "Email Excerpt - Meridian QA Director to Program Office",
+      "spans": [
+        {
+          "span_id": "EX-005-1",
+          "text": "FROM: D. Marchetti, QA Director, Meridian Components Ltd. TO: Northgate Program Office. DATE: 2026-03-12. SUBJECT: Handoff packet for Lot HX-17.",
+          "sha256": "9dfdb72835a266fdd63f12092bce3ea7f5b2ee650f6af6741d6b2013341ca162"
+        },
+        {
+          "span_id": "EX-005-2",
+          "text": "Confirming the final inspection wrapped last week and the report will follow in the records shipment. The attestation letter in your packet reflects our quality directorate position.",
+          "sha256": "18092e5bd9e6c822c688a6b69885987dc2461259c74733b13d3b7c2987131583"
+        }
+      ]
+    },
+    {
+      "id": "EX-006",
+      "title": "Email Excerpt - Northgate Receiving Discrepancy Note",
+      "spans": [
+        {
+          "span_id": "EX-006-1",
+          "text": "FROM: R. Calder, Receiving Officer, Northgate Systems Group. TO: Program Office. DATE: 2026-03-22. SUBJECT: Missing inspection report in Lot HX-17 records.",
+          "sha256": "bd4299ad7c38ef5e5404159f32da25754f589ac944d9251e37857630a0d5ce88"
+        },
+        {
+          "span_id": "EX-006-2",
+          "text": "The handoff packet contains an attestation but the inspection report we received is dated after acceptance. Flagging for program review before final records closure.",
+          "sha256": "bf19f990b65358b0342ed8cb8607c56a12b814cdc29f46131a3c2d80a0a6a08b"
+        }
+      ]
+    },
+    {
+      "id": "EX-007",
+      "title": "Specification Sheet SPS-77 Rev C - Enclosure Assembly Requirements",
+      "spans": [
+        {
+          "span_id": "EX-007-1",
+          "text": "SPECIFICATION SHEET SPS-77 Rev C - Halcyon Avionics Enclosure Assembly. Section 4.7 Documentation: a final inspection report shall be provided to the customer prior to acceptance of each lot.",
+          "sha256": "ef9edc5858b97624cf6d5094abf0294f5715a373b24037c0c37870b9b0854387"
+        },
+        {
+          "span_id": "EX-007-2",
+          "text": "Section 4.9 Records: acceptance without the required inspection report is a documentation nonconformance and requires a corrective action record.",
+          "sha256": "37431514972bc0b00a71a29f1e8d01bc38901a3142e3d7a78b52f6234357b146"
+        }
+      ]
+    },
+    {
+      "id": "EX-008",
+      "title": "Purchase Order PO-88412 Clause Extract",
+      "spans": [
+        {
+          "span_id": "EX-008-1",
+          "text": "PURCHASE ORDER PO-88412 - Northgate Systems Group to Meridian Components Ltd. Clause 12(b): Vendor shall complete final inspection and deliver the inspection report before lot acceptance.",
+          "sha256": "188b21ae2a8c08c4928e18a09dce75c78b1d2f428efb3cab4f85aeeb82ed5ea9"
+        },
+        {
+          "span_id": "EX-008-2",
+          "text": "Clause 12(d): Acceptance does not waive customer rights arising from missing or late quality records.",
+          "sha256": "c2bc61381ac0de940c7e6ebb4e0285fa9e6d91fabf6dbd50e777a4b9489ad979"
+        }
+      ]
+    },
+    {
+      "id": "EX-009",
+      "title": "Packing Slip PS-55671",
+      "spans": [
+        {
+          "span_id": "EX-009-1",
+          "text": "MERIDIAN COMPONENTS LTD - Packing Slip PS-55671. Shipment MS-77102, Lot HX-17, PO-88412. 2 crates, 24 enclosures.",
+          "sha256": "7990c1369939a4294fb423f81dfb1e1f434809e8805879198e1212e13b1a96f5"
+        },
+        {
+          "span_id": "EX-009-2",
+          "text": "Documents included in records pouch: Certificate of Conformance CoC-90233, Attestation Letter ATL-2214, serial inventory listing.",
+          "sha256": "f5f76ace3ba0a0b49f223bb6f86ff2368efc75a9945233d4e7e3a4a33b12399f"
+        }
+      ]
+    },
+    {
+      "id": "EX-010",
+      "title": "Corrective Action Request CAR-018 (Draft)",
+      "spans": [
+        {
+          "span_id": "EX-010-1",
+          "text": "CORRECTIVE ACTION REQUEST CAR-018 (DRAFT) - Northgate Supplier Quality. Subject: Lot HX-17 documentation nonconformance under SPS-77 Rev C Section 4.9.",
+          "sha256": "2eeb04cc94bf4d7f9b224533649e3bb07f779aa512fb96ce671a68f94d77792f"
+        },
+        {
+          "span_id": "EX-010-2",
+          "text": "Draft opened 2026-03-23 after receiving noted the inspection report postdates acceptance. Requested vendor response within 10 business days. Status: awaiting program office disposition.",
+          "sha256": "c104d3fc9d07cfcf248c0fdac9fc4eb859a88562a8a623c9b4afc0f0de9186d2"
+        }
+      ]
+    },
+    {
+      "id": "EX-011",
+      "title": "Certificate of Conformance CoC-90233",
+      "spans": [
+        {
+          "span_id": "EX-011-1",
+          "text": "MERIDIAN COMPONENTS LTD - Certificate of Conformance CoC-90233. Lot HX-17 conforms to Specification Sheet SPS-77 Rev C for all tested attributes.",
+          "sha256": "d5d738f6ec011dfb93b29eb905065a91db43430435c8bbb897c08b68ad8ff8ff"
+        },
+        {
+          "span_id": "EX-011-2",
+          "text": "Issued 2026-03-11 by the Quality Directorate. This certificate does not substitute for the inspection report required by Section 4.7.",
+          "sha256": "ea42a0c8c2b9fd797d39ab2b5e2e6b76e8f34031158e071991b784079fbf273c"
+        }
+      ]
+    },
+    {
+      "id": "EX-012",
+      "title": "Serial Number Inventory Log - Lot HX-17",
+      "spans": [
+        {
+          "span_id": "EX-012-1",
+          "text": "SERIAL INVENTORY LOG - Lot HX-17. Serials HX17-0081 through HX17-0104 received into stores 2026-03-12 against PO-88412.",
+          "sha256": "d37665865f869b9ab856fb51f16b9a7779ffdbd7401e0fd47ee9410dbf500b9f"
+        },
+        {
+          "span_id": "EX-012-2",
+          "text": "Two units, S/N HX17-0088 and HX17-0103, hold a quality hold tag pending review of rework records referenced by the supplier.",
+          "sha256": "ad4867003e8caa75eddef150a11fe789c38ecba7a38169dd7bd6d74c45995627"
+        }
+      ]
+    },
+    {
+      "id": "EX-013",
+      "title": "Handoff Review Meeting Minutes",
+      "spans": [
+        {
+          "span_id": "EX-013-1",
+          "text": "MINUTES - Lot HX-17 handoff review, 2026-03-24. Attendees: Program Office, Supplier Quality, Receiving.",
+          "sha256": "32fc230db74dd1db1bcdac9e7555d291594874458f09bfca51840e33c116ea8d"
+        },
+        {
+          "span_id": "EX-013-2",
+          "text": "The board reviewed the attestation dated before acceptance against the inspection report performed on 2026-03-19. Action: program office to adjudicate the contested claim and seal the session record.",
+          "sha256": "b5ba4de0b78442defe591cd3bd4c276742c1e6adb8c31aaf36199701dfbcccce"
+        }
+      ]
+    }
+  ],
+  "publicKey": "012bf18466aa183b95e064e288784609170fbf87759ee7c2c2d50e42620bd148",
+  "signature": "dc9141368f6926d98d28dafaf148ec759e04b6fab0da819565bbc15ec5782860fa58a66a777fe6b1f848ea90cf3cceed9a874efbbaf43b810296148e07ab2f0e"
+}

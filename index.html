@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Evidence Desk — AI receipts for claims that matter</title>
+  <link rel="stylesheet" href="/src/ui/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">Evidence Desk</span>
+      <span class="brand-sub">AI receipts for claims that matter</span>
+    </div>
+    <div class="status-cluster">
+      <span id="webmcp-status" class="badge badge-neutral">WEBMCP: CHECKING</span>
+      <span id="agent-cluster-status" class="badge badge-neutral" title="window.originAgentCluster runtime check">AGENT CLUSTER: UNKNOWN</span>
+    </div>
+  </header>
+
+  <div id="unsupported-banner" class="banner banner-warn" hidden>
+    <p>
+      <strong>WEBMCP UNAVAILABLE in this browser.</strong>
+      Tools are not registered because <code>document.modelContext</code> is not present.
+      The caseboard below is fully functional, and you can run the clearly-labeled
+      simulated agent to see the same review flow.
+    </p>
+    <button id="btn-run-sim-banner" type="button">Run simulated agent review</button>
+  </div>
+
+  <main id="app">
+    <section id="claim-card" class="card claim-card" aria-labelledby="claim-title">
+      <h2 id="claim-title">Contested claim under review</h2>
+      <blockquote id="claim-text" class="claim-text">
+        Did the vendor provide the required inspection report before acceptance?
+      </blockquote>
+      <div class="claim-actions">
+        <button id="btn-copy-judge-prompt" type="button" class="primary">Copy judge prompt</button>
+        <span id="copy-feedback" class="feedback" role="status"></span>
+      </div>
+      <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
+    </section>
+
+    <section class="card log-card" aria-labelledby="log-title">
+      <h2 id="log-title">Live tool-call log</h2>
+      <ol id="tool-log" class="tool-log" aria-live="polite"></ol>
+    </section>
+
+    <section class="card board-card" aria-labelledby="board-title">
+      <h2 id="board-title">Caseboard — evidence exhibits</h2>
+      <p class="hint">
+        Agent tools may ADD exhibits only.
+        Pin / Remove / Reject / Seal are human-exclusive controls.
+      </p>
+      <div id="exhibit-grid" class="exhibit-grid" aria-label="Exhibit cards"></div>
+    </section>
+
+    <section class="card seal-card">
+      <button id="btn-seal-receipt" type="button" class="primary big">SEAL RECEIPT</button>
+      <span class="hint">Seals a local session receipt referencing the accepted evidence hashes. No network. Tamper-evident, not tamper-proof.</span>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Synthetic data only — vendor “Meridian Components Ltd” and all exhibits are invented.</span>
+    <span>Receipts are tamper-evident, not tamper-proof, and are not authoritative legal signatures.</span>
+  </footer>
+
+  <div id="sim-ribbon" class="sim-ribbon" hidden>SIMULATED AGENT — NOT A REAL WEBMCP CLIENT</div>
+
+  <div id="seal-modal-backdrop" class="modal-backdrop" hidden>
+    <div id="seal-modal" class="modal card" role="dialog" aria-modal="true" aria-labelledby="seal-modal-title">
+      <h2 id="seal-modal-title">Sealed session receipt</h2>
+      <pre id="seal-receipt-preview" class="receipt-preview"></pre>
+      <div class="modal-actions">
+        <button id="btn-download-receipt" type="button" class="primary">Download receipt JSON</button>
+        <button id="btn-close-modal" type="button">Close (Esc)</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

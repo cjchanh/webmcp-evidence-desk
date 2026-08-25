@@ -1,0 +1,8 @@
+EXHIBIT: EX-001
+TITLE: Vendor Attestation Letter - Inspection Completion
+[SPAN EX-001-1]
+MERIDIAN COMPONENTS LTD - Quality Directorate. Attestation Letter ATL-2214. To: Northgate Systems Group Program Office. Re: Halcyon Avionics Enclosure Assembly, Purchase Order PO-88412.
+[SPAN EX-001-2]
+We hereby attest that the required final inspection for Lot HX-17 was completed on 2026-03-10, prior to acceptance, and that all units conform to Specification Sheet SPS-77 Rev C.
+[SPAN EX-001-3]
+This attestation is issued in support of the handoff packet delivered to the customer program office.

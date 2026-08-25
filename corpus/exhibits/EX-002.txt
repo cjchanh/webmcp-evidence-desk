@@ -1,0 +1,8 @@
+EXHIBIT: EX-002
+TITLE: Inspection Report IR-2219 - Final Electrical and Mechanical Inspection
+[SPAN EX-002-1]
+MERIDIAN COMPONENTS LTD - Inspection Report IR-2219. Lot HX-17, Halcyon Avionics Enclosure Assembly. Inspector of record: K. Osei, Certified Quality Inspector CQI-4471.
+[SPAN EX-002-2]
+All electrical continuity and mechanical torque checks were performed on 2026-03-19 at the Meridian Fab 2 facility. Two units (S/N HX17-0088, HX17-0103) required rework of connector seating prior to pass.
+[SPAN EX-002-3]
+Report approved and released by Quality Manager on 2026-03-20. Distribution: Program Office, Records Retention.

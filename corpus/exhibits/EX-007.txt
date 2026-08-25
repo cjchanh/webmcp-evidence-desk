@@ -1,0 +1,6 @@
+EXHIBIT: EX-007
+TITLE: Specification Sheet SPS-77 Rev C - Enclosure Assembly Requirements
+[SPAN EX-007-1]
+SPECIFICATION SHEET SPS-77 Rev C - Halcyon Avionics Enclosure Assembly. Section 4.7 Documentation: a final inspection report shall be provided to the customer prior to acceptance of each lot.
+[SPAN EX-007-2]
+Section 4.9 Records: acceptance without the required inspection report is a documentation nonconformance and requires a corrective action record.

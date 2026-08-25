@@ -1,0 +1,6 @@
+EXHIBIT: EX-005
+TITLE: Email Excerpt - Meridian QA Director to Program Office
+[SPAN EX-005-1]
+FROM: D. Marchetti, QA Director, Meridian Components Ltd. TO: Northgate Program Office. DATE: 2026-03-12. SUBJECT: Handoff packet for Lot HX-17.
+[SPAN EX-005-2]
+Confirming the final inspection wrapped last week and the report will follow in the records shipment. The attestation letter in your packet reflects our quality directorate position.

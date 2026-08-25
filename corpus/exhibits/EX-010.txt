@@ -1,0 +1,6 @@
+EXHIBIT: EX-010
+TITLE: Corrective Action Request CAR-018 (Draft)
+[SPAN EX-010-1]
+CORRECTIVE ACTION REQUEST CAR-018 (DRAFT) - Northgate Supplier Quality. Subject: Lot HX-17 documentation nonconformance under SPS-77 Rev C Section 4.9.
+[SPAN EX-010-2]
+Draft opened 2026-03-23 after receiving noted the inspection report postdates acceptance. Requested vendor response within 10 business days. Status: awaiting program office disposition.

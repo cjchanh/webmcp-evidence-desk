@@ -1,0 +1,6 @@
+EXHIBIT: EX-008
+TITLE: Purchase Order PO-88412 Clause Extract
+[SPAN EX-008-1]
+PURCHASE ORDER PO-88412 - Northgate Systems Group to Meridian Components Ltd. Clause 12(b): Vendor shall complete final inspection and deliver the inspection report before lot acceptance.
+[SPAN EX-008-2]
+Clause 12(d): Acceptance does not waive customer rights arising from missing or late quality records.

@@ -1,0 +1,8 @@
+EXHIBIT: EX-003
+TITLE: Acceptance Certificate AC-1147
+[SPAN EX-003-1]
+NORTHGATE SYSTEMS GROUP - Acceptance Certificate AC-1147. Contract line: Halcyon Avionics Enclosure Assembly, Lot HX-17, Purchase Order PO-88412.
+[SPAN EX-003-2]
+The customer accepted Lot HX-17 into service on 2026-03-14 following receiving verification at Dock 4. Acceptance covers 24 units, serials HX17-0081 through HX17-0104.
+[SPAN EX-003-3]
+Signed by receiving officer R. Calder. Certificate recorded in the acceptance register on 2026-03-16.

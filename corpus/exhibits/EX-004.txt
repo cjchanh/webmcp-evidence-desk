@@ -1,0 +1,6 @@
+EXHIBIT: EX-004
+TITLE: Delivery Log DL-3092
+[SPAN EX-004-1]
+FREIGHT RECEIVING LOG DL-3092 - Northgate Dock 4. Shipment MS-77102 from Meridian Components Ltd received 2026-03-11 at 09:40.
+[SPAN EX-004-2]
+Contents: 2 crates, 24 enclosures, Lot HX-17 against PO-88412. No visible transit damage. Crates routed to receiving verification queue.

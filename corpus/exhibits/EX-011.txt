@@ -1,0 +1,6 @@
+EXHIBIT: EX-011
+TITLE: Certificate of Conformance CoC-90233
+[SPAN EX-011-1]
+MERIDIAN COMPONENTS LTD - Certificate of Conformance CoC-90233. Lot HX-17 conforms to Specification Sheet SPS-77 Rev C for all tested attributes.
+[SPAN EX-011-2]
+Issued 2026-03-11 by the Quality Directorate. This certificate does not substitute for the inspection report required by Section 4.7.

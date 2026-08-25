@@ -1,0 +1,13 @@
+# Signing keys NEVER enter source control.
+keys/
+*.key
+*.pem
+
+# Dependencies / build output
+node_modules/
+dist/
+
+# Local env / OS noise
+.env
+.env.*
+.DS_Store

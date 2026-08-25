@@ -1,0 +1,8 @@
+# Static headers for Cloudflare Pages (and compatible hosts).
+# Runtime code additionally checks window.originAgentCluster rather than
+# trusting these headers alone.
+/*
+  Origin-Agent-Cluster: ?1
+  Permissions-Policy: tools=self
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer

@@ -1,0 +1,6 @@
+EXHIBIT: EX-006
+TITLE: Email Excerpt - Northgate Receiving Discrepancy Note
+[SPAN EX-006-1]
+FROM: R. Calder, Receiving Officer, Northgate Systems Group. TO: Program Office. DATE: 2026-03-22. SUBJECT: Missing inspection report in Lot HX-17 records.
+[SPAN EX-006-2]
+The handoff packet contains an attestation but the inspection report we received is dated after acceptance. Flagging for program review before final records closure.
