@@ -44,7 +44,8 @@
 
     <section class="card log-card" aria-labelledby="log-title">
       <h2 id="log-title">Live tool-call log</h2>
-      <ol id="tool-log" class="tool-log" aria-live="polite"></ol>
+      <ol id="tool-log" class="tool-log"></ol>
+      <span id="log-live-status" class="sr-only" role="status"></span>
     </section>
 
     <section class="card board-card" aria-labelledby="board-title">
@@ -76,8 +77,10 @@
       <pre id="seal-receipt-preview" class="receipt-preview"></pre>
       <div class="modal-actions">
         <button id="btn-download-receipt" type="button" class="primary">Download receipt JSON</button>
+        <button id="btn-verify-receipt" type="button">Verify this receipt</button>
         <button id="btn-close-modal" type="button">Close (Esc)</button>
       </div>
+      <span id="receipt-verify-status" class="feedback" role="status"></span>
     </div>
   </div>
 

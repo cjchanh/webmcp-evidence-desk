@@ -15,7 +15,7 @@ import {
   applyHumanAction,
   createBoard
 } from './domain/board.ts'
-import { buildSealedReceipt, collectAcceptedEvidence } from './domain/receipt.ts'
+import { buildSealedReceipt, collectAcceptedEvidence, verifySealedReceiptEnvelope } from './domain/receipt.ts'
 import { evaluateClaim } from './domain/evaluate.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
 import type {
@@ -94,6 +94,8 @@ const els = {
   grid: byId<HTMLDivElement>('exhibit-grid'),
   sealBtn: byId<HTMLButtonElement>('btn-seal-receipt'),
   sealStatus: byId<HTMLSpanElement>('seal-status'),
+  verifyReceiptBtn: byId<HTMLButtonElement>('btn-verify-receipt'),
+  receiptVerifyStatus: byId<HTMLSpanElement>('receipt-verify-status'),
   simInline: byId<HTMLButtonElement>('btn-run-sim-inline'),
   modalBackdrop: byId<HTMLDivElement>('seal-modal-backdrop'),
   receiptPreview: byId<HTMLPreElement>('seal-receipt-preview'),
@@ -290,6 +292,7 @@ async function sealReceipt(): Promise<void> {
     const envelope = await buildSealedReceipt(
       {
         sealedAt: new Date().toISOString(),
+        sessionId: crypto.randomUUID(),
         claimText: HERO_CLAIM,
         verdict: sealedVerdict,
         acceptedEvidence: accepted,
@@ -329,6 +332,21 @@ function downloadReceipt(): void {
   a.remove()
   URL.revokeObjectURL(url)
   log('HUMAN', 'receipt JSON downloaded')
+}
+
+/** Cycle-3: re-verify the sealed envelope on demand and show the verdict. */
+async function verifyLastReceipt(): Promise<void> {
+  if (!state.lastReceipt) return
+  els.receiptVerifyStatus.textContent = 'VERIFYING RECEIPT…'
+  const result = await verifySealedReceiptEnvelope(state.lastReceipt, {
+    manifestExhibits: MANIFEST.exhibits
+  })
+  if (result.signatureValid && result.hashesAnchoredInManifest) {
+    els.receiptVerifyStatus.textContent =
+      'RECEIPT VERIFY OK — signature valid; accepted hashes anchored in signed manifest'
+  } else {
+    els.receiptVerifyStatus.textContent = `RECEIPT VERIFY FAILED — ${result.problems.join('; ') || 'signature invalid'}`
+  }
 }
 
 /** Cycle-1 a11y: trap Tab inside the open modal; restore focus on close. */
@@ -445,6 +463,7 @@ async function bootInner(): Promise<void> {
 els.copyBtn.addEventListener('click', () => void copyJudgePrompt())
 els.sealBtn.addEventListener('click', () => void sealReceipt())
 els.downloadBtn.addEventListener('click', downloadReceipt)
+els.verifyReceiptBtn.addEventListener('click', () => void verifyLastReceipt())
 els.closeModalBtn.addEventListener('click', closeModal)
 els.bannerSim.addEventListener('click', () => void runSimulated())
 els.simInline.addEventListener('click', () => void runSimulated())

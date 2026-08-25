@@ -19,6 +19,10 @@ export function appendLog(logEl: HTMLOListElement, tag: LogTag, text: string): H
   li.append(tagSpan, textSpan)
   logEl.appendChild(li)
   logEl.scrollTop = logEl.scrollHeight
+  // Cycle-3 a11y: single polite announcement of the LATEST entry instead of an
+  // aria-live storm over every burst line.
+  const liveStatus = document.getElementById('log-live-status')
+  if (liveStatus) liveStatus.textContent = `[${tag}] ${text}`
   return li
 }
 
@@ -39,6 +43,8 @@ export interface ExhibitCardCallbacks {
   onReject(exhibitId: string): void
 }
 
+export const MAX_RENDERED_CARDS = 100
+
 export function renderExhibitGrid(
   gridEl: HTMLElement,
   exhibits: Exhibit[],
@@ -48,7 +54,11 @@ export function renderExhibitGrid(
 ): void {
   gridEl.textContent = ''
 
-  for (const exhibit of exhibits) {
+  // Cycle-3 hardening: bound DOM fan-out. Shipped corpus is 13 cards; this cap
+  // keeps a future larger signed manifest from exploding layout.
+  const rendered = exhibits.slice(0, MAX_RENDERED_CARDS)
+
+  for (const exhibit of rendered) {
     const entry = board.entries.find((e) => e.exhibit_id === exhibit.id)
     const quarantined = quarantinedIds.has(exhibit.id)
 
@@ -108,6 +118,11 @@ export function renderExhibitGrid(
     }
 
     gridEl.appendChild(card)
+  }
+
+  if (exhibits.length > rendered.length) {
+    const stub = el('p', 'hint', `Showing first ${rendered.length} of ${exhibits.length} verified exhibits.`)
+    gridEl.appendChild(stub)
   }
 }
 

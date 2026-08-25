@@ -12,7 +12,8 @@
  */
 
 import { throwIfAborted } from './errors.ts'
-import { bytesToHex, utf8Bytes } from './hex.ts'
+import { bytesToHex, hexToBytes, utf8Bytes } from './hex.ts'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import type { Verdict } from './types.ts'
 
 export interface ReceiptSigner {
@@ -70,12 +71,15 @@ export interface SealedReceiptInput {
   toolLog: string[]
   manifestPublicKey: string
   manifestSignature: string
+  /** Random session identifier (cycle-3): ties envelope to one sealing session. */
+  sessionId?: string
 }
 
 export interface SealedReceiptEnvelope {
   format: 'evidence-desk-receipt/v1'
   receipt: {
     sealed_at: string
+    session_id?: string
     claim_text: string
     verdict: Verdict | 'PENDING'
     accepted_evidence: AcceptedEvidenceItem[]
@@ -88,6 +92,15 @@ export interface SealedReceiptEnvelope {
   receipt_public_key: string
 }
 
+/**
+ * Cycle-3 hardening: the tool log is a rendering of agent-influenced strings.
+ * Collapse line breaks so a crafted claim can never inject fake [TAG] lines
+ * into the sealed record.
+ */
+function sanitizeLogLine(line: string): string {
+  return line.replace(/[\r\n\t]+/g, ' ').slice(0, 500)
+}
+
 export async function buildSealedReceipt(
   input: SealedReceiptInput,
   signer: ReceiptSigner,
@@ -97,13 +110,14 @@ export async function buildSealedReceipt(
 
   const receipt = {
     sealed_at: input.sealedAt,
+    ...(input.sessionId ? { session_id: input.sessionId } : {}),
     claim_text: input.claimText,
     verdict: input.verdict,
     accepted_evidence: input.acceptedEvidence,
-    tool_log: input.toolLog,
+    tool_log: input.toolLog.map(sanitizeLogLine),
     manifest_public_key: input.manifestPublicKey,
     manifest_signature: input.manifestSignature,
-    note: 'Tamper-evident local session receipt signed with an ephemeral key. Not an authoritative legal signature.'
+    note: 'Tamper-evident local session receipt signed with an ephemeral key. Detects post-download modification; not proof of origin, signer identity, or seal time; not an authoritative legal signature.'
   }
 
   const payload = utf8Bytes(JSON.stringify(receipt))
@@ -118,4 +132,107 @@ export async function buildSealedReceipt(
     receipt_signature: bytesToHex(signature),
     receipt_public_key: bytesToHex(signer.publicKey())
   }
+}
+
+export interface ReceiptVerificationResult {
+  /** Envelope shape + signature integrity over the as-parsed receipt object. */
+  signatureValid: boolean
+  /** accepted_evidence span hashes cross-checked against the signed manifest. */
+  hashesAnchoredInManifest: boolean | null
+  problems: string[]
+}
+
+/**
+ * Cycle-3 hardening: verify a sealed envelope WITHOUT trusting it.
+ *
+ * What this establishes:
+ *  - internal signature integrity over the receipt exactly as parsed;
+ *  - that every accepted span hash exists in the manifest whose (publicKey,
+ *    signature) the receipt chains to.
+ * What it cannot establish: who held the session key, when sealing happened,
+ * or authenticity of exhibit text beyond the manifest's own hash chain.
+ */
+export async function verifySealedReceiptEnvelope(
+  envelope: unknown,
+  opts?: {
+    signal?: AbortSignal
+    /** When provided, accepted span hashes are cross-checked against it. */
+    manifestExhibits?: ReadonlyArray<{
+      id: string
+      spans: ReadonlyArray<{ sha256: string }>
+    }>
+  }
+): Promise<ReceiptVerificationResult> {
+  throwIfAborted(opts?.signal)
+  const problems: string[] = []
+  const result: ReceiptVerificationResult = {
+    signatureValid: false,
+    hashesAnchoredInManifest: null,
+    problems
+  }
+
+  if (!envelope || typeof envelope !== 'object') {
+    problems.push('envelope is not an object')
+    return result
+  }
+  const env = envelope as Partial<SealedReceiptEnvelope>
+  if (env.format !== 'evidence-desk-receipt/v1') {
+    problems.push('unknown envelope format')
+    return result
+  }
+  if (!env.receipt || typeof env.receipt !== 'object') {
+    problems.push('missing receipt object')
+    return result
+  }
+  let pub: Uint8Array
+  let sig: Uint8Array
+  try {
+    pub = hexToBytes(String(env.receipt_public_key))
+    sig = hexToBytes(String(env.receipt_signature))
+  } catch {
+    problems.push('malformed receipt key material')
+    return result
+  }
+
+  // Signature is over the receipt EXACTLY as parsed — re-serialization with
+  // different key order would invalidate, by design (as-parsed rule).
+  const payload = utf8Bytes(JSON.stringify(env.receipt))
+  let ok = false
+  try {
+    ok = ed25519.verify(sig, payload, pub)
+  } catch {
+    ok = false
+  }
+  result.signatureValid = ok
+  if (!ok) {
+    problems.push('receipt signature does not verify against receipt_public_key')
+  }
+
+  // Cross-check accepted hashes against the signed manifest when the caller
+  // supplies the authentic exhibit list.
+  const receipt = env.receipt as {
+    accepted_evidence?: Array<{ exhibit_id: string; span_sha256s?: string[] }>
+  }
+  if (opts?.manifestExhibits && Array.isArray(receipt.accepted_evidence)) {
+    const byId = new Map(opts.manifestExhibits.map((m) => [m.id, m]))
+    let anchored = receipt.accepted_evidence.length > 0
+    for (const item of receipt.accepted_evidence) {
+      const manifestExhibit = byId.get(item.exhibit_id)
+      if (!manifestExhibit) {
+        anchored = false
+        problems.push(`accepted exhibit ${item.exhibit_id} not present in signed manifest`)
+        continue
+      }
+      const manifestHashes = new Set(manifestExhibit.spans.map((s) => s.sha256))
+      for (const h of item.span_sha256s ?? []) {
+        if (!manifestHashes.has(h)) {
+          anchored = false
+          problems.push(`accepted hash ${h.slice(0, 12)}… not in manifest spans for ${item.exhibit_id}`)
+        }
+      }
+    }
+    result.hashesAnchoredInManifest = anchored
+  }
+
+  return result
 }

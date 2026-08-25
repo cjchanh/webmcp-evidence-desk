@@ -57,6 +57,32 @@ async function loadExhibits() {
   // Sanity: exhibit ids must be unique and span ids unique within an exhibit.
   const ids = new Set(exhibits.map((e) => e.id))
   if (ids.size !== exhibits.length) throw new Error('duplicate exhibit ids in corpus')
+
+  // Cycle-3 hardening: the evaluator classifies by title. A silent rename of a
+  // load-bearing exhibit would silently degrade verdicts — fail the BUILD
+  // instead when any required role is missing or duplicated.
+  const roleOfTitle = (title: string): string => {
+    const t = title.toLowerCase()
+    if (/attestation/.test(t)) return 'attestation'
+    if (/inspection report/.test(t)) return 'inspection_report'
+    if (/acceptance certificate/.test(t)) return 'acceptance'
+    return 'other'
+  }
+  const required = ['attestation', 'inspection_report', 'acceptance'] as const
+  const counts = new Map<string, number>()
+  for (const e of exhibits) {
+    const role = roleOfTitle(e.title)
+    if (role !== 'other') counts.set(role, (counts.get(role) ?? 0) + 1)
+  }
+  for (const role of required) {
+    const n = counts.get(role) ?? 0
+    if (n !== 1) {
+      throw new Error(
+        `corpus must contain exactly one '${role}' exhibit (found ${n}) — evaluator classification depends on it`
+      )
+    }
+  }
+
   return exhibits
 }
 

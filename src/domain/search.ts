@@ -37,18 +37,25 @@ export function searchExhibits(
     throw new TypeError('invalid params: query must contain searchable terms')
   }
   const limit = opts?.limit ?? SEARCH_MAX_RESULTS
+  // Cycle-3 hardening: dedupe tokens — repeated query terms multiplied scores
+  // and cost without changing ranking intent.
+  const uniqueTokens = [...new Set(tokens)]
 
   const scored: Array<SearchResult & { bestSpanText: string }> = []
   for (const exhibit of exhibits) {
     const titleLower = exhibit.title.toLowerCase()
+    // Title bonus counted ONCE per exhibit (cycle-3: was inside the per-span
+    // loop, multiplying both cost and score by span count).
     let score = 0
+    for (const token of uniqueTokens) {
+      if (titleLower.includes(token)) score += 3
+    }
     let bestSpanText = ''
     let bestSpanScore = 0
     for (const span of exhibit.spans) {
       const textLower = span.text.toLowerCase()
       let spanScore = 0
-      for (const token of tokens) {
-        if (titleLower.includes(token)) score += 3
+      for (const token of uniqueTokens) {
         spanScore += countOccurrences(textLower, token)
       }
       score += spanScore

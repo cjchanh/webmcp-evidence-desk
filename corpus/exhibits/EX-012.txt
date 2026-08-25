@@ -3,4 +3,4 @@ TITLE: Serial Number Inventory Log - Lot HX-17
 [SPAN EX-012-1]
 SERIAL INVENTORY LOG - Lot HX-17. Serials HX17-0081 through HX17-0104 received into stores 2026-03-12 against PO-88412.
 [SPAN EX-012-2]
-Two units, S/N HX17-0088 and HX17-0103, hold a quality hold tag pending review of rework records referenced by the supplier.
+Two units, S/N HX17-0088 and HX17-0103, are flagged for rework scheduled 2026-03-19; interim containment applied and the lot was provisionally released to acceptance.

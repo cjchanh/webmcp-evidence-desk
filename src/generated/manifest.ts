@@ -9,7 +9,7 @@ export const MANIFEST: EvidenceManifest = {
   "exhibits": [
     {
       "id": "EX-001",
-      "title": "Vendor Attestation Letter - Inspection Completion",
+      "title": "Vendor Attestation Letter - Quality Completion Certification",
       "spans": [
         {
           "span_id": "EX-001-1",
@@ -97,8 +97,8 @@ export const MANIFEST: EvidenceManifest = {
         },
         {
           "span_id": "EX-005-2",
-          "text": "Confirming the final inspection wrapped last week and the report will follow in the records shipment. The attestation letter in your packet reflects our quality directorate position.",
-          "sha256": "18092e5bd9e6c822c688a6b69885987dc2461259c74733b13d3b7c2987131583"
+          "text": "Confirming the final inspection wrapped on 2026-03-10 and the report will follow in the records shipment. The attestation letter in your packet reflects our quality directorate position.",
+          "sha256": "1fca4be8690cbbd625c5c543ef44ee4a405b3d2778757fa4d4a4940dec9d641a"
         }
       ]
     },
@@ -209,8 +209,8 @@ export const MANIFEST: EvidenceManifest = {
         },
         {
           "span_id": "EX-012-2",
-          "text": "Two units, S/N HX17-0088 and HX17-0103, hold a quality hold tag pending review of rework records referenced by the supplier.",
-          "sha256": "ad4867003e8caa75eddef150a11fe789c38ecba7a38169dd7bd6d74c45995627"
+          "text": "Two units, S/N HX17-0088 and HX17-0103, are flagged for rework scheduled 2026-03-19; interim containment applied and the lot was provisionally released to acceptance.",
+          "sha256": "a271ebffd66062bdedafcb5b6a40a5ad0dd150bde45c8cc7bde6b15edd5f12ef"
         }
       ]
     },
@@ -231,6 +231,6 @@ export const MANIFEST: EvidenceManifest = {
       ]
     }
   ],
-  "publicKey": "5c4932ccde8dc38f516e2fecc2b44c933b173165718e9e877f03e99a82f3b77a",
-  "signature": "b007666104770d516ce1b008f1ad117951315ca2621d6ad3455d0cde61d525311de0cbdd0f471210332af02fb4f2553ffedb7de085a8c283404fb6b51b5bd30a"
+  "publicKey": "f88a3503ed7aa052674e0775af2ab5256454a239d3e1852227d86186651b39de",
+  "signature": "83eebecabd76aa970f97ba8159f6fe64fe62610fa650fdd4e899bd45c7dca3e6e667d550ab7d30c92ccc03fa4a12f6a98e6d7cd3d25db003c6352858d19b3100"
 }
