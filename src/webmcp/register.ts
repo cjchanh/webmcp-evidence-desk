@@ -74,40 +74,63 @@ export interface RegistrationResult {
 /**
  * Deterministic shrinker: try full JSON; then progressively halve nested
  * arrays; final fallback is a truncated preview object. Always <= max.
+ *
+ * Cycle-2 hardening: total over ALL inputs — BigInt, cycles, functions,
+ * pathological nesting depths degrade to a bounded classified envelope and
+ * never throw out of a tool execute path.
  */
 export function toBoundedJson(value: unknown, maxChars = MAX_TOOL_OUTPUT_CHARS): string {
-  const attempt = (v: unknown): string | null => {
-    try {
-      const s = JSON.stringify(v)
-      return s !== undefined && s.length <= maxChars ? s : null
-    } catch {
-      return null
+  const notSerializable = (): string =>
+    JSON.stringify({
+      truncated: true,
+      note: 'output could not be serialized within the size bound'
+    }).slice(0, maxChars)
+
+  try {
+    const attempt = (v: unknown): string | null => {
+      try {
+        const s = JSON.stringify(v)
+        return s !== undefined && s.length <= maxChars ? s : null
+      } catch {
+        return null
+      }
     }
+
+    const direct = attempt(value)
+    if (direct) return direct
+
+    let current = structuredCloneSafe(value)
+    for (let i = 0; i < 12; i++) {
+      current = halveArrays(current)
+      const s = attempt(current)
+      if (s) return s
+    }
+
+    let preview = ''
+    try {
+      preview = JSON.stringify(value) ?? String(value)
+    } catch {
+      preview = String(typeof value)
+    }
+    return JSON.stringify({
+      truncated: true,
+      note: 'output exceeded size bound',
+      preview: preview.slice(0, Math.min(600, Math.max(0, maxChars - 80)))
+    }).slice(0, maxChars)
+  } catch {
+    return notSerializable()
   }
-
-  const direct = attempt(value)
-  if (direct) return direct
-
-  let current = structuredCloneSafe(value)
-  for (let i = 0; i < 12; i++) {
-    current = halveArrays(current)
-    const s = attempt(current)
-    if (s) return s
-  }
-
-  const preview = JSON.stringify(value) ?? String(value)
-  return JSON.stringify({
-    truncated: true,
-    note: 'output exceeded size bound',
-    preview: preview.slice(0, Math.min(600, maxChars - 80))
-  }).slice(0, maxChars)
 }
 
 function structuredCloneSafe(value: unknown): unknown {
   try {
     return structuredClone(value)
   } catch {
-    return JSON.parse(JSON.stringify(value ?? null))
+    try {
+      return JSON.parse(JSON.stringify(value ?? null))
+    } catch {
+      return null
+    }
   }
 }
 

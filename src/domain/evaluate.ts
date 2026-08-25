@@ -17,7 +17,9 @@
 import { throwIfAborted } from './errors.ts'
 import type { ClaimEvaluation, ClaimReason, Exhibit, Span } from './types.ts'
 
-const ISO_DATE = /\d{4}-\d{2}-\d{2}/
+// Lookarounds reject 5+ digit year fragments ("10000-01-01" must not yield
+// "0000-01-01" via substring match — cycle-2 fuzz finding).
+const ISO_DATE = /(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)/
 
 type Role = 'attestation' | 'inspection_report' | 'acceptance' | 'other'
 

@@ -12,7 +12,9 @@ export type LogTag = 'WEBMCP' | 'SIM' | 'HUMAN' | 'SYS' | 'ERR'
 
 export function appendLog(logEl: HTMLOListElement, tag: LogTag, text: string): HTMLLIElement {
   const li = el('li', 'log-entry')
-  const tagSpan = el('span', `log-tag log-tag-${tag.toLowerCase()} [${tag}]`, `[${tag}]`)
+  // Bracket text belongs in content only — bracketed CSS class tokens require
+  // escaping and duplicated the tag already rendered via textContent.
+  const tagSpan = el('span', `log-tag log-tag-${tag.toLowerCase()}`, `[${tag}]`)
   const textSpan = el('span', 'log-text', text)
   li.append(tagSpan, textSpan)
   logEl.appendChild(li)

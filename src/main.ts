@@ -105,6 +105,15 @@ const els = {
 // --- logging ----------------------------------------------------------------
 
 function log(tag: LogTag, text: string): void {
+  if (state.toolLog.length >= MAX_LOG_ENTRIES) {
+    // Drop oldest half; mark the truncation so sealed receipts disclose it.
+    const dropped = state.toolLog.length - Math.floor(MAX_LOG_ENTRIES / 2)
+    state.toolLog.splice(0, dropped)
+    state.toolLog.unshift(`[SYS] log truncated — ${dropped} oldest entries dropped`)
+    while (els.log.children.length > Math.floor(MAX_LOG_ENTRIES / 2) + 1) {
+      els.log.firstChild?.remove()
+    }
+  }
   state.toolLog.push(`[${tag}] ${text}`)
   appendLog(els.log, tag, text)
 }
@@ -121,13 +130,29 @@ function showSealStatus(text: string): void {
   }
 }
 
+// Cycle-2 hardening: bounded session history. The receipt embeds the full log,
+// so an uncapped log means an unbounded receipt on long judge sessions.
+const MAX_LOG_ENTRIES = 400
+
 // --- board ------------------------------------------------------------------
 
 function addToBoardFromAgent(exhibitId: string, stance: 'supports' | 'contradicts') {
+  // Cycle-2 hardening: referential gate at the agent boundary — the agent may
+  // only propose exhibits that are SIG VERIFIED, never quarantined ones.
+  const known = state.verified.some((v) => v.id === exhibitId)
+  if (!known || state.quarantinedIds.has(exhibitId)) {
+    return {
+      ok: false as const,
+      board: state.board,
+      reason: `exhibit_not_verified:${exhibitId}`
+    }
+  }
   const result = applyAgentAction(state.board, { action: 'add', exhibit_id: exhibitId, stance })
   if (result.ok) {
     state.board = result.board
     renderGrid()
+  } else if (result.reason !== 'duplicate_entry') {
+    log('ERR', `agent add ${exhibitId} refused: ${result.reason}`)
   }
   return result
 }
@@ -203,7 +228,8 @@ async function copyJudgePrompt(): Promise<void> {
       document.execCommand('copy')
       ta.remove()
     }
-    els.copyFeedback.textContent = 'PROMPT COPIED TO CLIPBOARD'
+    els.copyFeedback.textContent =
+      'PROMPT COPIED — paste into your agent with this page open; expect tool calls to appear in the log'
   } catch {
     els.copyFeedback.textContent = 'COPY FAILED — GRANT CLIPBOARD PERMISSION OR COPY FROM README'
   }
@@ -224,7 +250,12 @@ function makeEphemeralSigner() {
   }
 }
 
+// Cycle-2 hardening: one seal at a time. buildSealedReceipt yields internally,
+// so rapid clicks interleave without this gate and sign duplicate/divergent receipts.
+let sealInFlight = false
+
 async function sealReceipt(): Promise<void> {
+  if (sealInFlight) return
   // Cycle-1 hardening: sealing is refused until an evaluation exists, and the
   // receipt is rebuilt from the ACCEPTED set at seal time so verdict and
   // accepted_evidence can never disagree.
@@ -246,6 +277,7 @@ async function sealReceipt(): Promise<void> {
     showSealStatus(`SEAL PARTIAL — ${refused.length} board item(s) not SIG VERIFIED were excluded.`)
   }
 
+  sealInFlight = true
   try {
     const acceptedExhibits = accepted
       .map((a) => state.verified.find((v) => v.id === a.exhibit_id))
@@ -278,6 +310,8 @@ async function sealReceipt(): Promise<void> {
   } catch (err) {
     showSealStatus('SEAL FAILED — see tool log.')
     log('ERR', `seal failed: ${(err as Error)?.message ?? String(err)}`)
+  } finally {
+    sealInFlight = false
   }
 }
 
@@ -330,6 +364,19 @@ function trapModalFocus(e: KeyboardEvent): void {
 async function boot(): Promise<void> {
   els.verdictStamp.textContent = 'VERIFYING EVIDENCE…'
   log('SYS', 'verifying signed manifest client-side')
+  try {
+    await bootInner()
+  } catch (err) {
+    // Cycle-2 hardening: a thrown verify/crypto error must never dead-init the
+    // page into a state that LOOKS alive. Surface it and stop clean.
+    log('ERR', `boot failed: ${(err as Error)?.message ?? String(err)}`)
+    els.verdictStamp.textContent = 'BOOT FAILED — evidence could not be verified'
+    els.webmcpStatus.textContent = 'WEBMCP: OFFLINE'
+    showSealStatus('BOOT FAILED — reload or run the simulated review.')
+  }
+}
+
+async function bootInner(): Promise<void> {
 
   // Runtime check of origin agent cluster — headers alone are not trusted.
   const cluster = (window as unknown as { originAgentCluster?: boolean }).originAgentCluster
