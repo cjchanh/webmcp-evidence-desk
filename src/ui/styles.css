@@ -40,6 +40,20 @@ body {
   line-height: 1.6;
 }
 
+/* Archival paper grain — inline SVG feTurbulence noise over the paper body
+   background, ~4% opacity. Decorative only: pointer-events none, sits behind
+   opaque card surfaces. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
 :focus-visible {
   outline: 0.2rem solid var(--signal);
   outline-offset: 0.2rem;
@@ -100,7 +114,6 @@ body {
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  transition: color 80ms ease-in-out;
 }
 
 .badge-neutral { color: var(--slate); }
@@ -181,6 +194,31 @@ body {
 .verdict-contradicted { color: var(--risk); }
 .verdict-insufficient { color: var(--warn); }
 
+/* P0 signature sequence — verdict stamp SLAM. Scales 2.2→1 with bezier
+   overshoot, settles at rotate(-4deg). One pass per verdict; the global
+   reduced-motion kill block degrades this to an instant swap. */
+@keyframes verdict-slam {
+  from { transform: scale(2.2) rotate(-4deg); opacity: 0; }
+  55% { opacity: 1; }
+  to { transform: scale(1) rotate(-4deg); }
+}
+
+.verdict-stamp.verdict-slam {
+  animation: verdict-slam 240ms cubic-bezier(0.22, 1.6, 0.36, 1) both;
+}
+
+/* Board reacts to the slam: one 150ms translateX shake, ±3px. */
+@keyframes board-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+.board-card.board-shake {
+  animation: board-shake 150ms ease-in-out 1;
+}
+
 /* --- Provenance rail (tool log) -------------------------------------------- */
 
 .tool-log {
@@ -209,6 +247,23 @@ body {
 .log-tag-err { color: var(--rail-fail); }
 .log-tag-webmcp { color: var(--rail-webmcp); }
 
+/* P1 legible work — the newest log entry types in behind a caret. Only the
+   entry currently typing carries the caret; older entries are static text.
+   JS gates this off entirely under prefers-reduced-motion. */
+.log-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 2px;
+  background: var(--rail-text);
+  vertical-align: -0.15em;
+  animation: caret-blink 900ms steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  to { visibility: hidden; }
+}
+
 /* --- Exhibit cards (evidence documents) ------------------------------------ */
 
 .board-card {
@@ -230,6 +285,57 @@ body {
 }
 .exhibit-card[data-pinned] { border-top-color: var(--signal); }
 .exhibit-card:focus-visible { outline: 0.2rem solid var(--signal); outline-offset: 0.2rem; }
+
+/* P0 — exhibit arrival. Applied ONLY to cards added via the agent path on
+   their first mount; persisted/pre-loaded exhibits never carry this class
+   (anti-pattern A2: never animate persisted content). */
+@keyframes exhibit-arrive {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.exhibit-card.exhibit-arrive {
+  animation: exhibit-arrive 320ms ease-out both;
+}
+
+/* P1 — ink-underline agent marks. The stance badge draws its underline once,
+   synchronized with the host card's arrival (0%→100% background-size).
+   Re-rendered cards render the final state directly with no transition. */
+.stance-ink {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: left 0 bottom 0.05em;
+  background-size: 100% 0.09em;
+}
+
+.exhibit-arrive .stance-ink {
+  background-size: 0% 0.09em;
+}
+
+.exhibit-arrive .stance-ink.ink-drawn {
+  background-size: 100% 0.09em;
+  transition: background-size 600ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* P0 — hash-verification sweep. One shimmer pass across the exhibit id/hash
+   line after boot verification lands, staggered per card, terminating solid.
+   Never loops; class is removed on animationend. */
+@keyframes hash-sweep {
+  from { background-position: -180% 0; }
+  to { background-position: 180% 0; }
+}
+
+.hash-sweep {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(11, 92, 173, 0.28) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: hash-sweep 700ms ease-in-out 1 both;
+}
 
 .exhibit-head {
   display: flex;
@@ -290,7 +396,6 @@ button {
   background: var(--white);
   color: var(--graphite);
   cursor: pointer;
-  transition: border-color 80ms ease-in-out;
 }
 button:hover:not(:disabled) { border-color: var(--graphite); }
 button:disabled {
@@ -343,6 +448,93 @@ button.big {
 }
 .banner p { margin: 6px 0; }
 
+/* --- Timeline spine (pure presentational) ----------------------------------- */
+
+.timeline-spine {
+  margin: 0 0 18px;
+}
+
+.timeline-legend {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--oxide);
+  margin-bottom: 8px;
+}
+
+.timeline-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 0.14rem solid var(--oxide);
+  flex-shrink: 0;
+}
+
+.timeline-track {
+  position: relative;
+  height: 48px;
+  margin-inline: 24px;
+}
+
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 0.08rem solid var(--line);
+}
+
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--slate);
+}
+
+.timeline-dot-contested {
+  width: 13px;
+  height: 13px;
+  background: var(--white);
+  border: 0.14rem solid var(--oxide);
+}
+
+.timeline-label {
+  position: absolute;
+  top: calc(50% + 10px);
+  left: 0;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--slate);
+}
+
+.timeline-label-alt {
+  top: auto;
+  bottom: calc(50% + 10px);
+}
+
+.timeline-label-contested {
+  color: var(--oxide);
+  font-weight: 700;
+}
+
 /* --- Seal modal -------------------------------------------------------------- */
 
 .modal-backdrop {
@@ -389,6 +581,34 @@ button.big {
   gap: 10px;
   margin-top: 12px;
   flex-wrap: wrap;
+}
+
+/* P2 archival finish — wax-disc motif beside PASS verify results. Purely
+   decorative: aria-hidden, conic-gradient wax with a highlight. */
+.wax-seal {
+  display: inline-block;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.5), transparent 42%),
+    conic-gradient(from 210deg, #9c3a2d, #7e2b21, #b4543f, #8a332a, #9c3a2d);
+  box-shadow: inset 0 0 0 0.12rem rgba(22, 25, 29, 0.14);
+  vertical-align: -0.2rem;
+  margin-right: 6px;
+}
+
+/* P2 — receipt preview reveals line-by-line on open. Stagger capped at the
+   first 12 lines; deeper lines share the final delay so the receipt is fully
+   readable immediately after one short wave. */
+.receipt-line {
+  display: block;
+  animation: receipt-line-in 200ms ease-out both;
+}
+
+@keyframes receipt-line-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* --- Footer / ribbon ---------------------------------------------------------- */

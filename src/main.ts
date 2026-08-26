@@ -34,9 +34,12 @@ import {
   appendLog,
   cycleExhibits,
   renderExhibitGrid,
+  renderReceiptPreview,
   setVerdict,
   type LogTag
 } from './ui/caseboard.ts'
+import { renderTimeline } from './ui/timeline.ts'
+import { el } from './ui/dom.ts'
 import { ed25519 } from '@noble/curves/ed25519.js'
 
 const HERO_CLAIM = 'Did the vendor provide the required inspection report before acceptance?'
@@ -92,6 +95,7 @@ const els = {
   verdictStamp: byId<HTMLDivElement>('verdict-stamp'),
   log: byId<HTMLOListElement>('tool-log'),
   grid: byId<HTMLDivElement>('exhibit-grid'),
+  timeline: byId<HTMLDivElement>('timeline-spine'),
   sealBtn: byId<HTMLButtonElement>('btn-seal-receipt'),
   sealStatus: byId<HTMLSpanElement>('seal-status'),
   verifyReceiptBtn: byId<HTMLButtonElement>('btn-verify-receipt'),
@@ -138,6 +142,11 @@ const MAX_LOG_ENTRIES = 400
 
 // --- board ------------------------------------------------------------------
 
+// P0 exhibit arrival: exhibit ids whose agent-add has not yet played its
+// one-time mount animation. Populated ONLY on the agent add path — persisted
+// and pre-loaded exhibits never animate (anti-pattern A2).
+const pendingArrival = new Set<string>()
+
 function addToBoardFromAgent(exhibitId: string, stance: 'supports' | 'contradicts') {
   // Cycle-2 hardening: referential gate at the agent boundary — the agent may
   // only propose exhibits that are SIG VERIFIED, never quarantined ones.
@@ -152,6 +161,7 @@ function addToBoardFromAgent(exhibitId: string, stance: 'supports' | 'contradict
   const result = applyAgentAction(state.board, { action: 'add', exhibit_id: exhibitId, stance })
   if (result.ok) {
     state.board = result.board
+    pendingArrival.add(exhibitId)
     renderGrid()
   } else if (result.reason !== 'duplicate_entry') {
     log('ERR', `agent add ${exhibitId} refused: ${result.reason}`)
@@ -175,14 +185,32 @@ function renderGrid(): void {
     onPin: (id) => humanAction('pin', id),
     onRemove: (id) => humanAction('remove', id),
     onReject: (id) => humanAction('reject', id)
-  })
+  }, { arriveIds: pendingArrival })
+  // One mount, one animation: clear so later re-renders (pin/remove/reject)
+  // rebuild these cards in their final state with no replay.
+  pendingArrival.clear()
 }
 
 // --- verdict ----------------------------------------------------------------
 
+/** P0 signature sequence: the stamp SLAMs (caseboard) and the board shakes. */
+function shakeBoard(): void {
+  const boardCard = els.grid.closest<HTMLElement>('.board-card')
+  if (!boardCard) return
+  boardCard.classList.remove('board-shake')
+  void boardCard.offsetWidth
+  boardCard.classList.add('board-shake')
+  boardCard.addEventListener(
+    'animationend',
+    () => boardCard.classList.remove('board-shake'),
+    { once: true }
+  )
+}
+
 function applyVerdict(evaluation: ClaimEvaluation): void {
   state.verdict = evaluation.verdict
   setVerdict(els.verdictStamp, evaluation)
+  shakeBoard()
 }
 
 // --- simulated lane ---------------------------------------------------------
@@ -311,7 +339,7 @@ async function sealReceipt(): Promise<void> {
     )
 
     state.lastReceipt = envelope
-    els.receiptPreview.textContent = JSON.stringify(envelope, null, 2)
+    renderReceiptPreview(els.receiptPreview, JSON.stringify(envelope, null, 2))
     els.modalBackdrop.hidden = false
     lastFocusedBeforeModal = document.activeElement as HTMLElement | null
     els.closeModalBtn.focus()
@@ -345,16 +373,29 @@ function downloadReceipt(): void {
 async function verifyLastReceipt(): Promise<void> {
   if (!state.lastReceipt) return
   els.receiptVerifyStatus.textContent = 'VERIFYING RECEIPT…'
+  setWaxSeal(false)
   const result = await verifySealedReceiptEnvelope(state.lastReceipt, {
     manifestExhibits: MANIFEST.exhibits,
     expectedManifestPublicKey: MANIFEST.publicKey
   })
-  if (result.signatureValid && result.hashesAnchoredInManifest) {
+  const pass = result.signatureValid === true && result.hashesAnchoredInManifest === true
+  if (pass) {
     els.receiptVerifyStatus.textContent =
       'RECEIPT VERIFY PASS — internal signature valid; accepted hashes anchored in the signed manifest'
   } else {
     els.receiptVerifyStatus.textContent = `RECEIPT VERIFY FAILED — ${result.problems.join('; ') || 'signature invalid'}`
   }
+  setWaxSeal(pass)
+}
+
+/** P2 archival finish: conic-gradient wax-disc motif beside PASS results.
+ * Decorative only — aria-hidden, removed on any non-PASS result. */
+function setWaxSeal(pass: boolean): void {
+  els.receiptVerifyStatus.parentElement?.querySelector('.wax-seal')?.remove()
+  if (!pass) return
+  const wax = el('span', 'wax-seal')
+  wax.setAttribute('aria-hidden', 'true')
+  els.receiptVerifyStatus.before(wax)
 }
 
 /** Cycle-1 a11y: trap Tab inside the open modal; restore focus on close. */
@@ -386,6 +427,26 @@ function trapModalFocus(e: KeyboardEvent): void {
 }
 
 // --- boot -------------------------------------------------------------------
+
+/** P0 hash-verification sweep: one shimmer pass across each exhibit id/hash
+ * line, staggered 60ms per card, terminating solid. Runs ONCE after
+ * verifyManifest passes; later re-renders never re-add the class. Under the
+ * global reduced-motion kill block no animation runs and the class is inert. */
+function runHashSweep(): void {
+  const idLines = els.grid.querySelectorAll<HTMLElement>('.exhibit-id')
+  idLines.forEach((line, i) => {
+    line.classList.add('hash-sweep')
+    line.style.animationDelay = `${i * 60}ms`
+    line.addEventListener(
+      'animationend',
+      () => {
+        line.classList.remove('hash-sweep')
+        line.style.animationDelay = ''
+      },
+      { once: true }
+    )
+  })
+}
 
 async function boot(): Promise<void> {
   els.verdictStamp.textContent = 'VERIFYING EVIDENCE…'
@@ -427,6 +488,8 @@ async function bootInner(): Promise<void> {
   }
 
   renderGrid()
+  runHashSweep()
+  renderTimeline(els.timeline, state.verified)
 
   // Sim button appears only after verification lands (cycle-4 ordering fix).
   els.simInline.hidden = false
