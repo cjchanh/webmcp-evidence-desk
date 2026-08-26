@@ -15,6 +15,7 @@ const ROOT = resolve(__dirname, '..')
 const shipped = JSON.parse(
   readFileSync(resolve(ROOT, 'public/evidence/manifest.json'), 'utf8')
 )
+const shippedHeaders = readFileSync(resolve(ROOT, 'public/_headers'), 'utf8')
 
 describe('shipped manifest integrity', () => {
   it('manifest signature validates against the embedded public key', async () => {
@@ -33,5 +34,15 @@ describe('shipped manifest integrity', () => {
   it('hero corpus keeps both contradiction sides verifiable', async () => {
     const report = await verifyManifest(shipped)
     expect(report.verified.length).toBeGreaterThanOrEqual(12)
+  })
+})
+
+describe('shipped _headers security directives', () => {
+  it('pins the origin agent cluster', () => {
+    expect(shippedHeaders).toContain('Origin-Agent-Cluster: ?1')
+  })
+
+  it('scopes Permissions-Policy to the tools surface', () => {
+    expect(shippedHeaders).toContain('Permissions-Policy: tools=self')
   })
 })

@@ -94,7 +94,7 @@ rather than trusting headers alone. WebMCP requires Chrome 149+ (flag:
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE). Signing dependency `@noble/curves` is ISC;
+Apache-2.0 — see [LICENSE](LICENSE). Signing dependency `@noble/curves` is MIT;
 its license notices are preserved in `node_modules` and acknowledged here.
 
 ## WebMCP registration (the required pattern, literally)
