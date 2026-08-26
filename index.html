@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evidence Desk — AI receipts for claims that matter</title>
+  <title>Evidence Desk — Verifiable AI receipts</title>
   <link rel="stylesheet" href="/src/ui/styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="brand-name">Evidence Desk</span>
-      <span class="brand-sub">AI receipts for claims that matter</span>
+      <span class="brand-sub">Verifiable AI receipts</span>
     </div>
     <div class="status-cluster">
       <span id="webmcp-status" class="badge badge-neutral">WEBMCP: CHECKING</span>
@@ -22,11 +22,12 @@
     <p>
       <strong>WEBMCP UNAVAILABLE in this browser.</strong>
       Tools are not registered because <code>document.modelContext</code> is not present.
-      The caseboard below is fully functional, and you can run the clearly-labeled
-      simulated agent to see the same review flow.
+      The caseboard below is fully functional, and you can run the labeled simulated review to see the same flow.
     </p>
-    <button id="btn-run-sim-banner" type="button">Run simulated agent review</button>
+    <button id="btn-run-sim-banner" type="button">Run simulated review</button>
   </div>
+
+  <a class="skip-link" href="#app">Skip to content</a>
 
   <main id="app">
     <section id="claim-card" class="card claim-card" aria-labelledby="claim-title">
@@ -49,7 +50,7 @@
     </section>
 
     <section class="card board-card" aria-labelledby="board-title">
-      <h2 id="board-title">Caseboard — evidence exhibits</h2>
+      <h2 id="board-title">Caseboard — exhibits</h2>
       <p class="hint">
         Agent tools may ADD exhibits only.
         Pin / Remove / Reject / Seal are human-exclusive controls.

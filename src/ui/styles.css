@@ -1,296 +1,269 @@
-/* Evidence Desk — dark, high-contrast, text-first statuses. */
+/* Evidence Desk — CDS UX Foundry restyle.
+   Paper-document system per sovereign-root atlas.css: ink on paper, square
+   corners, visible lines instead of shadows, literal-text statuses. Dark
+   survives only where the atlas puts it: the provenance rail (tool log). */
 
 :root {
-  --bg: #10141a;
-  --panel: #1a2029;
-  --panel-edge: #2c3542;
-  --text: #e8edf4;
-  --muted: #9aa7b8;
-  --accent: #4da3ff;
-  --ok: #37c978;
-  --warn: #e6b23c;
-  --fail: #ff5d5d;
-  --sim: #b48cff;
+  color-scheme: light;
+  --paper: #F4F7F8;
+  --graphite: #172026;
+  --slate: #5B6870;
+  --signal: #0B5CAD;
+  --oxide: #9C3A2D;
+  --white: #FFFFFF;
+  --line: #C8D1D6;
+  --ok: #2E6B4F;
+  --warn: #8A6116;
+  --risk: #9B2C2C;
+  --sim: #5B3E96;
+  --sim-deep: #4C3385;
+  --rail-text: #E8EDF4;
+  --rail-ok: #8FD4A8;
+  --rail-warn: #E8C06A;
+  --rail-fail: #F1948A;
+  --rail-webmcp: #9DC3F0;
+  --rail-sim: #C9B8F5;
+  --rail-sys: #B7C2CB;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: Charter, "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
+html { background: var(--paper); color: var(--graphite); }
+
 body {
   margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 15px;
-  line-height: 1.5;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
 }
+
+:focus-visible {
+  outline: 0.2rem solid var(--signal);
+  outline-offset: 0.2rem;
+}
+
+.skip-link {
+  background: var(--white);
+  left: 1rem;
+  padding: 0.65rem 0.9rem;
+  position: absolute;
+  top: -5rem;
+  z-index: 5;
+}
+.skip-link:focus { top: 1rem; }
+
+/* --- Masthead ------------------------------------------------------------- */
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--panel-edge);
-  background: var(--panel);
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px clamp(1rem, 3vw, 2rem);
+  background: var(--white);
+  border-bottom: 0.12rem solid var(--graphite);
 }
 
 .brand-name {
-  font-weight: 700;
-  font-size: 18px;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
 }
 
 .brand-sub {
   margin-left: 12px;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--slate);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
 }
 
 .status-cluster {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
+
+/* --- Status legend (badges): literal text, currentColor rules ------------- */
 
 .badge {
   display: inline-block;
-  padding: 2px 8px;
-  border: 1px solid var(--panel-edge);
-  border-radius: 4px;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border: 0.08rem solid currentColor;
+  border-radius: 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: color 80ms ease-in-out;
 }
 
-.badge-ok {
-  color: var(--ok);
-  border-color: var(--ok);
-}
+.badge-neutral { color: var(--slate); }
+.badge-ok { color: var(--ok); }
+.badge-fail { color: var(--risk); }
+.badge-active { color: var(--signal); }
+.badge-supports { color: var(--ok); }
+.badge-contradicts { color: var(--warn); }
 
-.badge-fail {
-  color: var(--fail);
-  border-color: var(--fail);
-}
-
-.badge-supports {
-  color: var(--ok);
-  border-color: var(--ok);
-}
-
-.badge-contradicts {
-  color: var(--warn);
-  border-color: var(--warn);
-}
-
-.badge-neutral {
-  color: var(--muted);
-}
-
-.badge-active {
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.banner {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--panel-edge);
-}
-
-.banner-warn {
-  background: #2a2410;
-  color: var(--warn);
-}
-
-.banner button {
-  margin-top: 8px;
-}
+/* --- Layout ---------------------------------------------------------------- */
 
 #app {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 20px;
+  margin-inline: auto;
+  max-width: 84rem;
+  padding: 1.5rem clamp(1rem, 3vw, 3rem);
   display: grid;
-  gap: 16px;
+  gap: 2.5rem;
 }
 
 .card {
-  background: var(--panel);
-  border: 1px solid var(--panel-edge);
-  border-radius: 8px;
-  padding: 16px 18px;
+  background: var(--white);
+  border: 0.08rem solid var(--line);
+  padding: 24px;
 }
 
-.card h2 {
-  margin: 0 0 10px;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+/* --- Claim card (hero document) -------------------------------------------- */
+
+.claim-card {
+  border-top: 0.25rem solid var(--signal);
+}
+
+#claim-title,
+.log-title,
+#board-title {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 12px;
 }
 
 .claim-text {
-  margin: 0 0 12px;
-  font-size: 19px;
-  font-weight: 700;
-  border-left: 3px solid var(--accent);
-  padding-left: 12px;
+  font-family: var(--font-serif);
+  font-size: clamp(1.55rem, 3vw, 2.2rem);
+  line-height: 1.25;
+  font-weight: 500;
+  margin: 0 0 20px;
+  max-width: 48rem;
+  border-left: 0.15rem solid var(--line);
+  padding-left: 16px;
 }
 
 .claim-actions {
   display: flex;
-  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
 
 .feedback {
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--slate);
+  font-size: 0.9rem;
 }
 
 .verdict-stamp {
   display: inline-block;
-  padding: 6px 12px;
-  border: 2px solid var(--muted);
-  border-radius: 6px;
-  font-weight: 700;
+  border: 0.15rem solid currentColor;
+  border-radius: 0.2rem;
+  padding: 0.4rem 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
   letter-spacing: 0.06em;
+  transform: rotate(-1.5deg);
 }
 
-.verdict-supported {
-  border-color: var(--ok);
-  color: var(--ok);
-}
+.verdict-pending { color: var(--slate); }
+.verdict-supported { color: var(--ok); }
+.verdict-contradicted { color: var(--risk); }
+.verdict-insufficient { color: var(--warn); }
 
-.verdict-contradicted {
-  border-color: var(--fail);
-  color: var(--fail);
-}
-
-.verdict-insufficient {
-  border-color: var(--warn);
-  color: var(--warn);
-}
-
-button {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--panel-edge);
-  border-radius: 5px;
-  padding: 7px 14px;
-  font: inherit;
-  cursor: pointer;
-}
-
-button:hover {
-  border-color: var(--accent);
-}
-
-button.primary {
-  border-color: var(--accent);
-  color: var(--accent);
-  font-weight: 700;
-}
-
-button.big {
-  font-size: 16px;
-  padding: 10px 22px;
-}
-
-:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
-}
+/* --- Provenance rail (tool log) -------------------------------------------- */
 
 .tool-log {
+  background: var(--graphite);
+  color: var(--rail-text);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
   list-style: none;
   margin: 0;
-  padding: 0;
-  max-height: 220px;
+  max-height: 320px;
   overflow-y: auto;
-  font-size: 13px;
+  padding: 12px 14px;
+  border-radius: 0.2rem;
 }
 
 .log-entry {
   padding: 3px 0;
-  border-bottom: 1px dashed var(--panel-edge);
+  border-bottom: 1px solid #2c3542;
 }
+.log-entry:last-child { border-bottom: none; }
 
-.log-tag {
-  font-weight: 700;
-  margin-right: 8px;
-}
+.log-tag-sim { color: var(--rail-sim); }
+.log-tag-human { color: var(--rail-ok); }
+.log-tag-sys { color: var(--rail-sys); }
+.log-tag-err { color: var(--rail-fail); }
+.log-tag-webmcp { color: var(--rail-webmcp); }
 
-.log-tag-webmcp {
-  color: var(--accent);
-}
+/* --- Exhibit cards (evidence documents) ------------------------------------ */
 
-.log-tag-sim {
-  color: var(--sim);
-}
-
-.log-tag-human {
-  color: var(--ok);
-}
-
-.log-tag-sys {
-  color: var(--muted);
-}
-
-.log-tag-err {
-  color: var(--fail);
-}
-
-.hint {
-  color: var(--muted);
-  font-size: 13px;
+.board-card {
+  border-top: 0.25rem solid var(--line);
 }
 
 .exhibit-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
 }
 
 .exhibit-card {
-  border: 1px solid var(--panel-edge);
-  border-radius: 6px;
-  padding: 12px;
-  background: #151b23;
+  background: var(--white);
+  border: 0.08rem solid var(--line);
+  border-top: 0.25rem solid var(--slate);
+  padding: 14px 16px;
+  cursor: default;
 }
-
-.exhibit-card:focus-visible {
-  outline-offset: 0;
-}
+.exhibit-card[data-pinned] { border-top-color: var(--signal); }
+.exhibit-card:focus-visible { outline: 0.2rem solid var(--signal); outline-offset: 0.2rem; }
 
 .exhibit-head {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: baseline;
+  border-bottom: 0.08rem solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .exhibit-id {
-  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
   font-weight: 700;
-  font-size: 13px;
+  color: var(--slate);
 }
 
 .exhibit-title {
+  font-size: 0.98rem;
+  font-weight: 700;
   margin: 0;
-  font-size: 14px;
 }
 
 .badge-row {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
-  margin: 8px 0;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
 .exhibit-preview {
-  color: var(--muted);
-  font-size: 12px;
-  margin: 6px 0;
+  color: var(--slate);
+  font-size: 0.9rem;
+  margin: 8px 0 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -299,67 +272,114 @@ button.big {
 
 .control-row {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* --- Buttons ---------------------------------------------------------------- */
+
+button {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  font-weight: 700;
+  min-height: 2.75rem;
+  padding: 0.4rem 1rem;
+  border-radius: 0.2rem;
+  border: 0.1rem solid var(--slate);
+  background: var(--white);
+  color: var(--graphite);
+  cursor: pointer;
+  transition: border-color 80ms ease-in-out;
+}
+button:hover:not(:disabled) { border-color: var(--graphite); }
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: var(--white);
+  font-weight: 750;
+}
+button.primary:hover:not(:disabled) { border-color: var(--graphite); }
+
+button.big {
+  min-height: 3.25rem;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.control-row button:nth-child(2),
+.control-row button:nth-child(3) {
+  color: var(--risk);
+  border-color: var(--risk);
+}
+
+.hint {
+  color: var(--slate);
+  font-size: 0.85rem;
 }
 
 .seal-card {
   display: flex;
+  gap: 14px;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 0.25rem solid var(--oxide);
 }
 
-.footer {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 12px 20px 32px;
-  color: var(--muted);
-  font-size: 12px;
-  display: grid;
-  gap: 4px;
-}
+/* --- Banners: authority-boundary pattern ------------------------------------ */
 
-.sim-ribbon {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 40;
-  text-align: center;
-  padding: 8px;
-  background: #241a38;
-  color: var(--sim);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  border-top: 1px solid var(--sim);
+.banner {
+  margin: 1.25rem auto 0;
+  max-width: 84rem;
+  background: var(--white);
+  border: 0.08rem solid var(--line);
+  border-left: 0.3rem solid var(--oxide);
+  padding: 14px 18px;
 }
+.banner p { margin: 6px 0; }
+
+/* --- Seal modal -------------------------------------------------------------- */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(22, 25, 29, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
+  z-index: 10;
 }
+.modal-backdrop[hidden] { display: none; }
 
 .modal {
-  width: min(760px, 100%);
-  max-height: 85vh;
+  width: min(46rem, 100%);
+  max-height: 86vh;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 8px 24px rgba(22, 25, 29, 0.12);
+  animation: modal-in 240ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .receipt-preview {
   flex: 1;
   overflow: auto;
-  background: #0d1117;
-  border: 1px solid var(--panel-edge);
-  border-radius: 6px;
+  background: var(--graphite);
+  color: var(--rail-text);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  border-radius: 0.2rem;
   padding: 12px;
-  font-size: 12px;
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -368,57 +388,37 @@ button.big {
   display: flex;
   gap: 10px;
   margin-top: 12px;
+  flex-wrap: wrap;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
-  }
+/* --- Footer / ribbon ---------------------------------------------------------- */
+
+.footer {
+  margin: 2.5rem auto 0;
+  max-width: 84rem;
+  padding: 16px clamp(1rem, 3vw, 3rem) 28px;
+  border-top: 0.08rem solid var(--line);
+  color: var(--slate);
+  font-size: 0.82rem;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
-/* Cycle-1 hardening: mobile breakpoint — judges may open on a phone. */
-@media (max-width: 520px) {
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-  .status-cluster {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .claim-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .claim-actions button {
-    width: 100%;
-  }
-  .modal-actions {
-    flex-wrap: wrap;
-    flex-direction: column;
-  }
-  .modal-actions button {
-    width: 100%;
-  }
-  .exhibit-grid {
-    grid-template-columns: 1fr;
-  }
-  .seal-card {
-    align-items: stretch;
-  }
-}
-
-/* Visible seal status (success/refusal/failure) — never log-only. */
-.seal-card .feedback[role='alert'] {
-  display: block;
-  margin-top: 8px;
-  font-weight: 600;
+.sim-ribbon {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--sim-deep);
+  border-top: 0.2rem solid var(--sim);
+  color: var(--white);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 8px;
+  z-index: 20;
 }
 
 .sr-only {
@@ -431,4 +431,39 @@ button.big {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* --- Mobile -------------------------------------------------------------------- */
+
+@media (max-width: 520px) {
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .claim-actions,
+  .modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .claim-actions button,
+  .modal-actions button {
+    width: 100%;
+  }
+  .exhibit-grid {
+    grid-template-columns: 1fr;
+  }
+  .seal-card {
+    align-items: stretch;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

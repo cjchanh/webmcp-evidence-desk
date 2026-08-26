@@ -48,11 +48,11 @@ const JUDGE_PROMPT = [
   'Review this contested procurement claim using the Evidence Desk page open in your agent browser:',
   `CLAIM: "${HERO_CLAIM}"`,
   'Use the page\'s WebMCP tools:',
-  "1. search_evidence — find exhibits relevant to the claim.",
-  '2. inspect_exhibit — read exact source spans (start with EX-001 vendor attestation and EX-002 inspection report).',
-  "3. evaluate_claim — test the claim and return SUPPORTED / CONTRADICTED / INSUFFICIENT with span-tied reasons.",
+  '1. search_evidence — find relevant exhibits.',
+  '2. inspect_exhibit — read exact source spans (start with EX-001, EX-002).',
+  '3. evaluate_claim — return SUPPORTED / CONTRADICTED / INSUFFICIENT with span-tied reasons.',
   "4. update_caseboard — action:'add' with exhibit_id and stance (supports|contradicts).",
-  'Expected flow: search first, inspect both sides, then evaluate; exhibits you add appear on the caseboard.',
+  'Expected flow: search first, inspect both sides, then evaluate; added exhibits appear on the caseboard.',
   'Pin, remove, reject, and seal are human-exclusive controls.'
 ].join('\n')
 
@@ -194,7 +194,7 @@ async function runSimulated(): Promise<void> {
   // Cycle-4: refuse a pre-boot or empty-corpus run — reviewing zero exhibits
   // produces a misleading INSUFFICIENT that reads as broken.
   if (state.verified.length === 0) {
-    showSealStatus('EVIDENCE STILL VERIFYING — try the simulated review in a moment.')
+    showSealStatus('EVIDENCE NOT VERIFIED YET — retry once SIG VERIFIED appears in the log.')
     log('ERR', 'simulated review refused: evidence not verified yet')
     return
   }
@@ -283,7 +283,7 @@ async function sealReceipt(): Promise<void> {
     log('ERR', `seal excluded ${r.exhibit_id}: ${r.reason}`)
   }
   if (refused.length > 0) {
-    showSealStatus(`SEAL PARTIAL — ${refused.length} board item(s) not SIG VERIFIED were excluded.`)
+    showSealStatus(`SEAL PARTIAL — ${refused.length} board entries lacked SIG VERIFIED and were excluded.`)
   }
 
   sealInFlight = true
@@ -351,7 +351,7 @@ async function verifyLastReceipt(): Promise<void> {
   })
   if (result.signatureValid && result.hashesAnchoredInManifest) {
     els.receiptVerifyStatus.textContent =
-      'RECEIPT VERIFY PASS — internal signature valid; accepted hashes anchored in the shipped signed manifest'
+      'RECEIPT VERIFY PASS — internal signature valid; accepted hashes anchored in the signed manifest'
   } else {
     els.receiptVerifyStatus.textContent = `RECEIPT VERIFY FAILED — ${result.problems.join('; ') || 'signature invalid'}`
   }
