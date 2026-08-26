@@ -7,6 +7,8 @@
   <link rel="stylesheet" href="/src/ui/styles.css" />
 </head>
 <body>
+  <a class="skip-link" href="#app">Skip to content</a>
+
   <header class="topbar">
     <div class="brand">
       <span class="brand-name">Evidence Desk</span>
@@ -27,33 +29,51 @@
     <button id="btn-run-sim-banner" type="button">Run simulated review</button>
   </div>
 
-  <a class="skip-link" href="#app">Skip to content</a>
-
   <main id="app">
-    <section id="claim-card" class="card claim-card" aria-labelledby="claim-title">
-      <h2 id="claim-title">Contested claim under review</h2>
+
+    <!-- The spine: what this is, in four lines -->
+    <section class="case-header">
+      <p class="eyebrow">CASE FILE HX-17 · VENDOR HANDOFF AUDIT · MARCH 2026</p>
+      <h1 class="case-question">Did Meridian Components deliver the required inspection report before acceptance?</h1>
+      <p class="lede">
+        Thirteen exhibits from the vendor handoff packet sit below.
+        Every span is hash-verified against a signed manifest — nothing here can be
+        quietly edited. Your AI agent searches the exhibits, inspects exact source
+        spans, and argues the claim. You decide what stands, then seal the record.
+      </p>
+      <ol class="how-strip" aria-label="How this works">
+        <li><span class="step-num">1</span><strong>INVESTIGATE</strong> — your agent searches and inspects the exhibits</li>
+        <li><span class="step-num">2</span><strong>ADJUDICATE</strong> — evidence lands on the caseboard; you pin or reject</li>
+        <li><span class="step-num">3</span><strong>SEAL</strong> — sign a tamper-evident local receipt of what stood</li>
+      </ol>
+    </section>
+
+    <!-- The contested claim + the two ways to run the review -->
+    <section class="card claim-card" aria-labelledby="claim-heading">
+      <p class="eyebrow">THE CONTESTED CLAIM</p>
       <blockquote id="claim-text" class="claim-text">
-        Did the vendor provide the required inspection report before acceptance?
+        “The vendor provided the required inspection report before acceptance.”
       </blockquote>
       <div class="claim-actions">
-        <button id="btn-copy-judge-prompt" type="button" class="primary">Copy judge prompt</button>
+        <button id="btn-copy-judge-prompt" type="button" class="primary">Copy agent briefing</button>
         <button id="btn-run-sim-inline" type="button" hidden>Run simulated review</button>
         <span id="copy-feedback" class="feedback" role="status"></span>
       </div>
+      <p class="hint">Paste the briefing into an agent that can see this page. Its tool calls will appear in the provenance rail.</p>
       <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
     </section>
 
-    <section class="card log-card" aria-labelledby="log-title">
-      <h2 id="log-title">Live tool-call log</h2>
+    <section class="card log-card" aria-labelledby="log-heading">
+      <h2 id="log-heading">Provenance — live tool-call record</h2>
       <ol id="tool-log" class="tool-log"></ol>
       <span id="log-live-status" class="sr-only" role="status"></span>
     </section>
 
-    <section class="card board-card" aria-labelledby="board-title">
-      <h2 id="board-title">Caseboard — exhibits</h2>
+    <section class="card board-card" aria-labelledby="board-heading">
+      <h2 id="board-heading">Caseboard</h2>
       <p class="hint">
-        Agent tools may ADD exhibits only.
-        Pin / Remove / Reject / Seal are human-exclusive controls.
+        The agent may ADD exhibits only.
+        Pin, Remove, Reject, and Seal are human-exclusive controls.
       </p>
       <div id="exhibit-grid" class="exhibit-grid" aria-label="Exhibit cards"></div>
     </section>
@@ -63,10 +83,11 @@
       <span id="seal-status" class="feedback" role="alert"></span>
       <span class="hint">Seals a local session receipt referencing the accepted evidence hashes. No network. Tamper-evident, not tamper-proof.</span>
     </section>
+
   </main>
 
   <footer class="footer">
-    <span>Synthetic data only — vendor “Meridian Components Ltd” and all exhibits are invented.</span>
+    <span>Synthetic case file — vendor “Meridian Components Ltd” and all exhibits are invented.</span>
     <span>Receipts are tamper-evident, not tamper-proof, and are not authoritative legal signatures.</span>
   </footer>
 

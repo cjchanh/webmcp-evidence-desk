@@ -467,3 +467,69 @@ button.big {
     scroll-behavior: auto !important;
   }
 }
+
+/* --- Case-file spine -------------------------------------------------------- */
+
+.case-header {
+  border-top: 0.25rem solid var(--graphite);
+  padding-top: 20px;
+}
+
+.eyebrow {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  color: var(--slate);
+  margin: 0 0 10px;
+}
+
+.case-question {
+  font-family: var(--font-serif);
+  font-size: clamp(1.9rem, 4.5vw, 3rem);
+  line-height: 1.15;
+  font-weight: 600;
+  margin: 0 0 16px;
+  max-width: 52rem;
+}
+
+.lede {
+  font-size: 1.05rem;
+  max-width: 46rem;
+  color: var(--graphite);
+  margin: 0 0 22px;
+}
+
+.how-strip {
+  list-style: none;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  margin: 0;
+  background: var(--white);
+  border: 0.08rem solid var(--line);
+}
+
+.how-strip li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.88rem;
+  min-width: 220px;
+  flex: 1;
+}
+
+.step-num {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--signal);
+  border: 0.08rem solid currentColor;
+  border-radius: 0.2rem;
+  width: 1.6rem;
+  height: 1.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
