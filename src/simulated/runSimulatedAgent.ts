@@ -48,6 +48,9 @@ function delay(ms: number, signal?: AbortSignal): Promise<void> {
 /**
  * Review sequence mirroring what a real agent would do with the four tools:
  * search -> inspect both sides of the contradiction -> evaluate -> add to board.
+ *
+ * Pacing contract: impatient judges see the whole arc fast — total scripted
+ * delay budget <= 6s, log lines terse and verb-first.
  */
 export async function runSimulatedAgent(
   cb: SimulatedAgentCallbacks,
@@ -56,33 +59,30 @@ export async function runSimulatedAgent(
   const signal = opts?.signal
   const exhibits = cb.exhibits()
 
-  cb.log('simulated review starting over verified evidence')
-  await delay(300, signal)
+  cb.log('searching…')
+  await delay(350, signal)
 
   const hits = searchExhibits('inspection report acceptance attestation', exhibits, { signal })
-  cb.log(
-    `search_evidence -> ${hits.length} hits: ` +
-      hits.map((h) => `${h.exhibit_id}(${h.score})`).join(', ')
-  )
-  await delay(350, signal)
+  cb.log(`found ${hits.length} hits — reading both sides`)
+  await delay(300, signal)
 
   for (const id of ['EX-003', 'EX-001', 'EX-002']) {
     try {
-      const detail = inspectExhibit(id, exhibits, { signal })
-      cb.log(`inspect_exhibit ${id} -> ${detail.spans.length} spans read`)
+      inspectExhibit(id, exhibits, { signal })
+      cb.log(`reading ${id} span r1…`)
     } catch {
-      cb.log(`inspect_exhibit ${id} -> unavailable (quarantined or absent)`)
+      cb.log(`reading ${id}… unavailable (quarantined or absent)`)
     }
-    await delay(300, signal)
+    await delay(260, signal)
   }
 
   const evaluation = evaluateClaim(HERO_CLAIM, exhibits, { signal })
   cb.onVerdict(evaluation)
   cb.log(
-    `evaluate_claim -> ${evaluation.verdict}` +
-      (evaluation.missing.length ? ` (missing: ${evaluation.missing.join('; ')})` : '')
+    `verdict: ${evaluation.verdict.toLowerCase()}` +
+      (evaluation.missing.length ? ` — missing: ${evaluation.missing.join('; ')}` : '')
   )
-  await delay(350, signal)
+  await delay(320, signal)
 
   const additions: Array<[string, Stance]> = [
     ['EX-002', 'contradicts'],
@@ -93,12 +93,12 @@ export async function runSimulatedAgent(
     const result = cb.addToBoard(exhibitId, stance)
     cb.log(
       result.ok
-        ? `update_caseboard add ${exhibitId} (${stance}) -> accepted`
-        : `update_caseboard add ${exhibitId} -> refused (${result.reason})`
+        ? `adding ${exhibitId} (${stance})`
+        : `refusing ${exhibitId} (${result.reason})`
     )
-    await delay(300, signal)
+    await delay(240, signal)
   }
 
   throwIfAborted(signal)
-  cb.log('simulated review complete — human adjudication required')
+  cb.log('complete — your move: pin, reject, seal')
 }

@@ -16,6 +16,7 @@ import {
   createBoard
 } from './domain/board.ts'
 import { buildSealedReceipt, collectAcceptedEvidence, verifySealedReceiptEnvelope } from './domain/receipt.ts'
+import { buildForgedExhibitCandidate, probeForgedExhibit } from './domain/forge.ts'
 import { evaluateClaim } from './domain/evaluate.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
 import type {
@@ -62,6 +63,8 @@ const JUDGE_PROMPT = [
 interface AppState {
   board: BoardState
   verified: Exhibit[]
+  /** Exhibits caught forged in-session; rendered quarantined, never evaluated. */
+  forged: Exhibit[]
   quarantinedIds: Set<string>
   verdict: Verdict | 'PENDING'
   toolLog: string[]
@@ -71,6 +74,7 @@ interface AppState {
 const state: AppState = {
   board: createBoard(),
   verified: [],
+  forged: [],
   quarantinedIds: new Set<string>(),
   verdict: 'PENDING',
   toolLog: [],
@@ -105,7 +109,15 @@ const els = {
   receiptPreview: byId<HTMLPreElement>('seal-receipt-preview'),
   downloadBtn: byId<HTMLButtonElement>('btn-download-receipt'),
   closeModalBtn: byId<HTMLButtonElement>('btn-close-modal'),
-  simRibbon: byId<HTMLDivElement>('sim-ribbon')
+  simRibbon: byId<HTMLDivElement>('sim-ribbon'),
+  forgeOpenBtn: byId<HTMLButtonElement>('btn-open-forge-bench'),
+  forgeResetBtn: byId<HTMLButtonElement>('btn-reset-case'),
+  forgeBackdrop: byId<HTMLDivElement>('forge-bench-backdrop'),
+  forgeBenchTitle: byId<HTMLHeadingElement>('forge-bench-title'),
+  forgeEditors: byId<HTMLDivElement>('forge-span-editors'),
+  forgeSubmitBtn: byId<HTMLButtonElement>('btn-submit-forgery'),
+  forgeCloseBtn: byId<HTMLButtonElement>('btn-close-forge-bench'),
+  forgeStatus: byId<HTMLSpanElement>('forge-status')
 }
 
 // --- logging ----------------------------------------------------------------
@@ -181,7 +193,10 @@ function humanAction(kind: 'pin' | 'remove' | 'reject', exhibitId: string): void
 }
 
 function renderGrid(): void {
-  renderExhibitGrid(els.grid, state.verified, state.board, state.quarantinedIds, {
+  // Forged exhibits caught this session render AFTER the verified set: their
+  // ids sit in quarantinedIds, so caseboard gives them the SIG FAILED badge,
+  // no controls, and the quarantine treatment — the tamper machinery itself.
+  renderExhibitGrid(els.grid, [...state.verified, ...state.forged], state.board, state.quarantinedIds, {
     onPin: (id) => humanAction('pin', id),
     onRemove: (id) => humanAction('remove', id),
     onReject: (id) => humanAction('reject', id)
@@ -293,6 +308,14 @@ let sealInFlight = false
 
 async function sealReceipt(): Promise<void> {
   if (sealInFlight) return
+  // Forge-demo hardening: compromised evidence refuses the seal outright.
+  // collectAcceptedEvidence would exclude quarantined entries, but a session
+  // that contains caught forgeries does not get a clean receipt — fail closed.
+  if (state.quarantinedIds.size > 0) {
+    showSealStatus('SEAL REFUSED — board contains quarantined material.')
+    log('ERR', `seal refused: quarantined material present (${[...state.quarantinedIds].join(', ')})`)
+    return
+  }
   // Cycle-1 hardening: sealing is refused until an evaluation exists, and the
   // receipt is rebuilt from the ACCEPTED set at seal time so verdict and
   // accepted_evidence can never disagree.
@@ -398,7 +421,7 @@ function setWaxSeal(pass: boolean): void {
   els.receiptVerifyStatus.before(wax)
 }
 
-/** Cycle-1 a11y: trap Tab inside the open modal; restore focus on close. */
+/** Cycle-1 a11y: trap Tab inside an open modal; restore focus on close. */
 let lastFocusedBeforeModal: HTMLElement | null = null
 
 function closeModal(): void {
@@ -408,10 +431,12 @@ function closeModal(): void {
   lastFocusedBeforeModal = null
 }
 
-function trapModalFocus(e: KeyboardEvent): void {
-  if (e.key !== 'Tab' || els.modalBackdrop.hidden) return
+function trapModalFocus(e: KeyboardEvent, backdrop: HTMLElement): void {
+  if (e.key !== 'Tab' || backdrop.hidden) return
   const focusables = Array.from(
-    els.modalBackdrop.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])')
+    backdrop.querySelectorAll<HTMLElement>(
+      'button, [href], [tabindex]:not([tabindex="-1"]), textarea'
+    )
   ).filter((n) => !n.hasAttribute('disabled'))
   if (focusables.length === 0) return
   const first = focusables[0]
@@ -423,6 +448,131 @@ function trapModalFocus(e: KeyboardEvent): void {
   } else if (!e.shiftKey && document.activeElement === last) {
     e.preventDefault()
     first.focus()
+  }
+}
+
+// --- forgery bench -----------------------------------------------------------
+//
+// The adversarial challenge: the judge edits EX-002's exact signed spans and
+// submits. The probe recomputes each span's sha256 — what the hash WOULD be —
+// and compares it to the hash the manifest actually recorded. Any edit fails
+// by construction, and the full caught sequence fires: quarantined card with
+// arrival animation, board shake, INSUFFICIENT verdict, sealed-shut seal gate.
+
+const FORGE_TARGET_ID = 'EX-002'
+let lastFocusedBeforeForge: HTMLElement | null = null
+
+function openForgeBench(): void {
+  const base = MANIFEST.exhibits.find((e) => e.id === FORGE_TARGET_ID)
+  if (!base) return
+  // The bench always loads the PRISTINE signed spans from the manifest —
+  // never session state — so every attempt starts from what was signed.
+  els.forgeBenchTitle.textContent = `Forgery bench — ${base.id} · ${base.title}`
+  els.forgeEditors.textContent = ''
+  for (const span of base.spans) {
+    const field = el('div', 'forge-span-field')
+    const label = el(
+      'label',
+      'forge-span-label',
+      `${span.span_id} · signed sha256 ${span.sha256.slice(0, 16)}…`
+    )
+    label.setAttribute('for', `forge-input-${span.span_id}`)
+    const ta = document.createElement('textarea')
+    ta.id = `forge-input-${span.span_id}`
+    ta.dataset.spanId = span.span_id
+    ta.value = span.text
+    ta.setAttribute('spellcheck', 'false')
+    field.append(label, ta)
+    els.forgeEditors.appendChild(field)
+  }
+  els.forgeStatus.textContent = ''
+  els.forgeBackdrop.hidden = false
+  lastFocusedBeforeForge = document.activeElement as HTMLElement | null
+  const firstEditor = els.forgeEditors.querySelector<HTMLTextAreaElement>('textarea')
+  ;(firstEditor ?? els.forgeCloseBtn).focus()
+}
+
+function closeForgeBench(): void {
+  els.forgeBackdrop.hidden = true
+  lastFocusedBeforeForge?.focus()
+  lastFocusedBeforeForge = null
+}
+
+async function submitForgery(): Promise<void> {
+  const base = MANIFEST.exhibits.find((e) => e.id === FORGE_TARGET_ID)
+  if (!base) return
+  if (state.quarantinedIds.has(FORGE_TARGET_ID)) {
+    els.forgeStatus.textContent =
+      'EX-002 IS ALREADY QUARANTINED — reset the case to forge again.'
+    return
+  }
+  const editedTexts = base.spans.map((span) => {
+    const ta = els.forgeEditors.querySelector<HTMLTextAreaElement>(
+      `textarea[data-span-id="${span.span_id}"]`
+    )
+    return ta ? ta.value : span.text
+  })
+  const candidate = buildForgedExhibitCandidate(base, editedTexts)
+  const report = await probeForgedExhibit(candidate)
+
+  if (!report.caught || report.failed_span_id === null) {
+    els.forgeStatus.textContent =
+      'NOTHING TO CATCH — every span still matches its signed hash. Edit something and submit again.'
+    log('HUMAN', 'forgery submitted — bytes matched the manifest; nothing forged yet')
+    return
+  }
+
+  // CAUGHT. The forged card lands on the board quarantined so the judge sees
+  // exactly what got caught; evaluation never touches forged bytes because
+  // they live outside state.verified.
+  const failedSpanId = report.failed_span_id
+  const failedProbe = report.probes.find((p) => p.span_id === failedSpanId)
+  state.verified = state.verified.filter((v) => v.id !== FORGE_TARGET_ID)
+  state.quarantinedIds.add(FORGE_TARGET_ID)
+  state.forged.push(candidate)
+  pendingArrival.add(FORGE_TARGET_ID)
+  renderGrid()
+  renderTimeline(els.timeline, state.verified)
+  log('ERR', `CAUGHT — span hash mismatch on ${failedSpanId} — ${FORGE_TARGET_ID} quarantined`)
+  if (failedProbe) {
+    log(
+      'ERR',
+      `sha256(${failedSpanId}) recomputed ${failedProbe.recomputed_sha256.slice(0, 16)}… ≠ recorded ${failedProbe.recorded_sha256.slice(0, 16)}…`
+    )
+  }
+  applyVerdict({
+    verdict: 'INSUFFICIENT',
+    reasons: [],
+    missing: ['integrity: forged exhibit rejected']
+  })
+  els.forgeResetBtn.hidden = false
+  const survivors = state.verified.length
+  els.forgeStatus.textContent =
+    `CAUGHT — span hash mismatch on ${failedSpanId}. Your edit changed bytes the manifest never signed. ` +
+    `The other ${survivors} exhibits remain SIG VERIFIED.`
+}
+
+/** RESET CASE: pristine board, PENDING verdict, original verified exhibits. */
+async function resetCase(): Promise<void> {
+  try {
+    const report = await verifyManifest(MANIFEST)
+    state.verified = report.verified
+    state.quarantinedIds = new Set(report.quarantined.map((q) => q.exhibit_id))
+    state.forged = []
+    state.board = createBoard()
+    state.verdict = 'PENDING'
+    pendingArrival.clear()
+    els.verdictStamp.textContent = 'VERDICT: PENDING REVIEW'
+    els.verdictStamp.className = 'verdict-stamp verdict-pending'
+    renderGrid()
+    renderTimeline(els.timeline, state.verified)
+    closeForgeBench()
+    els.forgeStatus.textContent = ''
+    els.forgeResetBtn.hidden = true
+    log('SYS', 'case reset — pristine signed exhibits restored')
+  } catch (err) {
+    log('ERR', `case reset failed: ${(err as Error)?.message ?? String(err)}`)
+    showSealStatus('RESET FAILED — see tool log.')
   }
 }
 
@@ -542,6 +692,14 @@ els.closeModalBtn.addEventListener('click', closeModal)
 els.bannerSim.addEventListener('click', () => void runSimulated())
 els.simInline.addEventListener('click', () => void runSimulated())
 els.simRibbon.addEventListener('click', () => {})
+els.forgeOpenBtn.addEventListener('click', openForgeBench)
+els.forgeCloseBtn.addEventListener('click', closeForgeBench)
+els.forgeSubmitBtn.addEventListener('click', () => void submitForgery())
+els.forgeResetBtn.addEventListener('click', () => void resetCase())
+
+els.forgeBackdrop.addEventListener('click', (e) => {
+  if (e.target === els.forgeBackdrop) closeForgeBench()
+})
 
 // Simulated lane is reachable even when WebMCP IS present (cycle-1 UX hardening),
 // but only AFTER boot verification lands (cycle-4): a mid-boot run would review
@@ -563,12 +721,17 @@ els.modalBackdrop.addEventListener('click', (e) => {
 })
 
 document.addEventListener('keydown', (e) => {
-  trapModalFocus(e)
+  trapModalFocus(e, els.modalBackdrop)
+  trapModalFocus(e, els.forgeBackdrop)
   if (e.key === 'Escape' && !els.modalBackdrop.hidden) {
     closeModal()
     return
   }
-  const modalOpen = !els.modalBackdrop.hidden
+  if (e.key === 'Escape' && !els.forgeBackdrop.hidden) {
+    closeForgeBench()
+    return
+  }
+  const modalOpen = !els.modalBackdrop.hidden || !els.forgeBackdrop.hidden
   if (modalOpen) return
   if (e.key === 'ArrowRight') cycleExhibits(els.grid, 1)
   if (e.key === 'ArrowLeft') cycleExhibits(els.grid, -1)

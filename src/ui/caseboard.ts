@@ -134,6 +134,9 @@ export function renderExhibitGrid(
 
     const card = el('article', arriving ? 'exhibit-card exhibit-arrive' : 'exhibit-card')
     card.dataset.exhibitId = exhibit.id
+    // Quarantine treatment hook: CSS draws the red left rule from this
+    // attribute; the literal-text badge below stays the semantic carrier.
+    if (quarantined) card.dataset.quarantined = 'true'
     card.tabIndex = 0
 
     const head = el('div', 'exhibit-head')

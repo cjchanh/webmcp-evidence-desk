@@ -611,6 +611,65 @@ button.big {
   to { opacity: 1; transform: none; }
 }
 
+/* --- Forgery bench (adversarial challenge) ---------------------------------- */
+
+.forge-card {
+  border-top: 0.25rem solid var(--oxide);
+}
+
+.forge-heading {
+  font-family: var(--font-serif);
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.forge-copy {
+  max-width: 46rem;
+  margin: 0 0 16px;
+}
+
+.challenge-line {
+  font-weight: 700;
+  margin: 12px 0 0;
+}
+
+.exhibit-card[data-quarantined] {
+  border-left: 0.3rem solid var(--risk);
+}
+
+.forge-span-field { margin-bottom: 14px; }
+
+.forge-span-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--slate);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.forge-span-field textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 8px 10px;
+  border: 0.08rem solid var(--line);
+  border-radius: 0.2rem;
+  background: var(--white);
+  color: var(--graphite);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.forge-status {
+  display: block;
+  margin-top: 10px;
+  font-weight: 700;
+}
+
 /* --- Footer / ribbon ---------------------------------------------------------- */
 
 .footer {

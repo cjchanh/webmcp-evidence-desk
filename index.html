@@ -33,19 +33,21 @@
 
     <!-- The spine: what this is, in four lines -->
     <section class="case-header">
-      <p class="eyebrow">CASE FILE HX-17 · VENDOR HANDOFF AUDIT · MARCH 2026</p>
+      <p class="eyebrow">CASE FILE HX-17 · ADVERSARIAL EVIDENCE DESK</p>
       <h1 class="case-question">Did Meridian Components deliver the required inspection report before acceptance?</h1>
       <p class="lede">
         Thirteen exhibits from the vendor handoff packet sit below.
         Every span is hash-verified against a signed manifest — nothing here can be
         quietly edited. Your AI agent searches the exhibits, inspects exact source
         spans, and argues the claim. You decide what stands, then seal the record.
+        Or skip the tour: open the forgery bench and try to slip a lie past the manifest.
       </p>
       <ol class="how-strip" aria-label="How this works">
         <li><span class="step-num">1</span><strong>INVESTIGATE</strong> — your agent searches and inspects the exhibits</li>
         <li><span class="step-num">2</span><strong>ADJUDICATE</strong> — evidence lands on the caseboard; you pin or reject</li>
         <li><span class="step-num">3</span><strong>SEAL</strong> — sign a tamper-evident local receipt of what stood</li>
       </ol>
+      <p class="challenge-line">Everything below is signed. Everything above board is yours to attack.</p>
     </section>
 
     <!-- The contested claim + the two ways to run the review -->
@@ -61,6 +63,20 @@
       </div>
       <p class="hint">Paste the briefing into an agent that can see this page. Its tool calls will appear in the provenance rail.</p>
       <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
+    </section>
+
+    <!-- The adversarial challenge: the judge attacks the manifest personally -->
+    <section class="card forge-card" aria-labelledby="forge-heading">
+      <p class="eyebrow">ADVERSARIAL CHALLENGE</p>
+      <h2 id="forge-heading" class="forge-heading">TRY TO FOOL IT</h2>
+      <p class="forge-copy">
+        Edit a real exhibit. Change a date. Slip in a lie. Submit your forgery
+        and watch the manifest catch it.
+      </p>
+      <div class="claim-actions">
+        <button id="btn-open-forge-bench" type="button" class="primary">OPEN THE FORGERY BENCH</button>
+        <button id="btn-reset-case" type="button" hidden>RESET CASE</button>
+      </div>
     </section>
 
     <section class="card log-card" aria-labelledby="log-heading">
@@ -104,6 +120,23 @@
         <button id="btn-close-modal" type="button">Close (Esc)</button>
       </div>
       <span id="receipt-verify-status" class="feedback" role="status"></span>
+    </div>
+  </div>
+
+  <div id="forge-bench-backdrop" class="modal-backdrop" hidden>
+    <div id="forge-bench" class="modal card" role="dialog" aria-modal="true" aria-labelledby="forge-bench-title">
+      <h2 id="forge-bench-title">Forgery bench</h2>
+      <p class="hint">
+        These are the exhibit's exact signed spans, byte for byte. Change
+        anything — a date, a serial, one word. On submit the desk recomputes
+        each span's sha256 and compares it to what the manifest signed.
+      </p>
+      <div id="forge-span-editors"></div>
+      <div class="modal-actions">
+        <button id="btn-submit-forgery" type="button" class="primary">SUBMIT FORGERY</button>
+        <button id="btn-close-forge-bench" type="button">Close (Esc)</button>
+      </div>
+      <span id="forge-status" class="feedback forge-status" role="status"></span>
     </div>
   </div>
 
