@@ -93,6 +93,39 @@ describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
     expect(result.signatureValid).toBe(false)
     expect(result.problems.length).toBeGreaterThan(0)
   })
+
+  it('a DECLINED receipt with zero accepted evidence verifies PASS (vacuous anchoring)', async () => {
+    // Decline path: humanDecision present, finalVerdict null -> verdict DECLINED,
+    // accepted_evidence [] by design. Anchoring over an empty list is vacuously
+    // true — the receipt must verify, not report a false "signature invalid".
+    const envelope = await buildSealedReceipt(
+      {
+        ...BASE_INPUT,
+        verdict: 'CONTRADICTED',
+        acceptedEvidence: [],
+        humanDecision: {
+          status: 'DECLINED',
+          actorRole: 'local-human-reviewer',
+          agentVerdict: 'CONTRADICTED',
+          finalVerdict: null,
+          rationale: null,
+          proposedAt: '2026-08-25T00:00:00.000Z',
+          decidedAt: '2026-08-25T00:00:05.000Z',
+          waitingMs: 5000
+        }
+      },
+      signer()
+    )
+    expect(envelope.receipt.verdict).toBe('DECLINED')
+    expect(envelope.receipt.accepted_evidence).toEqual([])
+    const report = await verifyManifest(MANIFEST)
+    const result = await verifySealedReceiptEnvelope(envelope, {
+      manifestExhibits: report.verified.map((e) => ({ id: e.id, spans: e.spans }))
+    })
+    expect(result.signatureValid).toBe(true)
+    expect(result.hashesAnchoredInManifest).toBe(true)
+    expect(result.problems).toEqual([])
+  })
 })
 
 describe('search ranking on the shipped corpus (cycle-3)', () => {

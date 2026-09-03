@@ -121,4 +121,71 @@ describe('user evidence UI through the live page', () => {
     const html = document.body.innerHTML
     expect(html).not.toMatch(/[\da-f]{64}/i)
   })
+
+  it('a tampered packet import shows LOAD REFUSED and never overwrites it with LOADED', async () => {
+    // Sign a real corpus first so a prior user manifest is active.
+    const input = document.getElementById('user-evidence-input') as HTMLTextAreaElement
+    input.value = TWO_EXHIBIT_CORPUS
+    ;(document.getElementById('btn-sign-user-evidence') as HTMLButtonElement).click()
+    await vi.waitFor(() => {
+      expect(document.getElementById('user-evidence-status')?.textContent).toContain(
+        'SIGNED LOCALLY'
+      )
+    })
+
+    // Capture the exported packet, tamper a span text (hash mismatch), import it.
+    const packet = await new Promise<string>((resolve) => {
+      let captured: string | null = null
+      const origCreate = URL.createObjectURL
+      URL.createObjectURL = (blob: Blob) => {
+        void blob.text().then((t) => {
+          captured = t
+        })
+        return origCreate.call(URL, blob)
+      }
+      ;(document.getElementById('btn-export-user-manifest') as HTMLButtonElement).click()
+      const iv = setInterval(() => {
+        if (captured !== null) {
+          clearInterval(iv)
+          URL.createObjectURL = origCreate
+          resolve(captured as string)
+        }
+      }, 20)
+      setTimeout(() => {
+        clearInterval(iv)
+        URL.createObjectURL = origCreate
+        resolve('')
+      }, 5000)
+    })
+    expect(packet).not.toBe('')
+
+    const env = JSON.parse(packet) as {
+      manifest: { exhibits: Array<{ spans: Array<{ text: string }> }> }
+    }
+    env.manifest.exhibits[0]!.spans[0]!.text += ' TAMPERED'
+    const tamperedJson = JSON.stringify(env)
+
+    const fileInput = document.getElementById(
+      'user-evidence-import-file'
+    ) as HTMLInputElement
+    const file = new File([tamperedJson], 'packet.json', { type: 'application/json' })
+    const dt = new DataTransfer()
+    dt.items.add(file)
+    fileInput.files = dt.files
+    fileInput.dispatchEvent(new Event('change', { bubbles: true }))
+
+    await vi.waitFor(() => {
+      expect(document.getElementById('user-evidence-status')?.textContent).toContain(
+        'LOAD REFUSED'
+      )
+    })
+    // The refusal copy must survive — never overwritten by success copy.
+    expect(document.getElementById('user-evidence-status')?.textContent).not.toContain(
+      'LOADED —'
+    )
+    // Prior case left unchanged: the earlier signed corpus is still active.
+    expect(document.getElementById('verdict-stamp')?.textContent).toBe(
+      'VERDICT: PENDING REVIEW'
+    )
+  })
 })

@@ -97,7 +97,7 @@ Show the two-column first viewport, four-tool status, trust contract, and live r
 
 **0:08–0:18 — start the real agent path**
 
-Select **COPY AGENT BRIEFING**, paste it into the agent, and send it.
+Select **INVESTIGATE WITH MY AGENT** (copies the briefing), paste it into the agent, and send it.
 
 > “The page gives the agent four bounded tools instead of making it guess through
 > buttons: search, inspect, evaluate, and propose to the caseboard.”
@@ -113,7 +113,7 @@ Keep the app visible as the real calls appear. Hold briefly on the date conflict
 **0:38–0:55 — human authority**
 
 Show EX-001 and EX-002 on the caseboard. Pin one, reject or retain the other, then
-select **ACCEPT AGENT VERDICT**.
+select **APPROVE AGENT VERDICT**.
 
 > “The agent can only propose. It cannot pin, reject, accept the verdict, or seal.
 > Those controls remain human-only.”

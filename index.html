@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Evidence Desk — Judge-first WebMCP evidence review</title>
+  <meta name="description" content="An agent investigates a signed evidence packet through four WebMCP tools; the human keeps the verdict and seals a tamper-evident receipt of what both sides did. Synthetic demo case from Centennial Defense Systems." />
+  <meta property="og:title" content="Evidence Desk — agent investigates, human decides" />
+  <meta property="og:description" content="Four real WebMCP tools over a signed evidence packet. The agent proposes; only the human can approve, correct, or decline — and the receipt preserves both." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://evidence.centennialdefense.systems" />
+  <meta name="twitter:card" content="summary" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/src/ui/styles.css" />
 </head>
 <body>
@@ -17,6 +24,7 @@
     <div class="status-cluster">
       <span id="webmcp-status" class="badge badge-neutral">WEBMCP: CHECKING</span>
       <span id="agent-cluster-status" class="badge badge-neutral" title="window.originAgentCluster runtime check">AGENT CLUSTER: UNKNOWN</span>
+      <span id="manifest-fingerprint" class="badge badge-neutral" title="sha256 of the signed manifest this page is adjudicating">MANIFEST: …</span>
     </div>
   </header>
 
@@ -52,6 +60,7 @@
         <span id="copy-feedback" class="feedback" role="status"></span>
         <p class="hint">Copies a self-contained four-tool briefing. Real calls appear in the live record.</p>
         <p id="trust-strip" class="trust-strip" aria-label="Trust summary">13 VERIFIED · 4 WEBMCP TOOLS · HUMAN-ONLY FINAL ACTION</p>
+        <p class="hint">Synthetic demo packet — not a legal record. Live WebMCP tool calls require a WebMCP-capable browser (Chrome 149+ with the WebMCP flag); otherwise the labeled simulated replay runs the same domain logic.</p>
       </div>
 
       <div class="card live-review-panel" aria-labelledby="log-heading">
@@ -95,6 +104,30 @@
       <li><span class="step-num">2</span><span><strong>HUMAN ADJUDICATES</strong><br />approve · correct · decline</span></li>
       <li><span class="step-num">3</span><span><strong>EVIDENCE PRESERVES</strong><br />hashes · manifest · local receipt</span></li>
     </ol>
+
+    <details id="tool-contract-disclosure" class="packet-disclosure">
+      <summary>THE FROZEN TOOL CONTRACT — what the agent may and may not do</summary>
+      <div class="tool-contract-grid">
+        <div>
+          <p class="document-label">AGENT TOOLS (document.modelContext.registerTool)</p>
+          <ul class="tool-contract-list">
+            <li><code>search_evidence</code> — ranked keyword search over verified exhibits</li>
+            <li><code>inspect_exhibit</code> — full hash-linked spans for one exhibit</li>
+            <li><code>evaluate_claim</code> — deterministic verdict, span-tied reasons</li>
+            <li><code>update_caseboard</code> — <strong>add-only</strong>, with a stance</li>
+          </ul>
+        </div>
+        <div>
+          <p class="document-label">HUMAN-EXCLUSIVE CONTROLS (no tool can reach these)</p>
+          <ul class="tool-contract-list">
+            <li>pin · remove · reject evidence</li>
+            <li>approve · correct · decline the verdict</li>
+            <li>seal the receipt</li>
+          </ul>
+          <p class="hint">Enforced in the domain layer, not just the UI — a tool-produced verdict can never be sealed without an explicit human decision.</p>
+        </div>
+      </div>
+    </details>
 
     <section class="card board-card" aria-labelledby="board-heading">
       <div class="section-heading">
@@ -215,14 +248,21 @@ Rules:
   - [SPAN id] starts a span; the following non-empty lines are its text.
   - Span ids must be unique within an exhibit.
   - Hard caps: 20 exhibits, 10 spans per exhibit.
+  - A verdict needs a dated ACCEPTANCE CERTIFICATE plus an INSPECTION REPORT
+    (or ATTESTATION) — the acceptance date anchors every comparison.
 
-Worked example:
+Worked example (paste-ready — yields VERDICT: CONTRADICTED):
 
   EXHIBIT: EX-101
-  TITLE: Inspection Report IR-2219
+  TITLE: Acceptance Certificate AC-100
   [SPAN EX-101-1]
+  Lot HX-17 accepted on 2026-03-14 by the program office.
+
+  EXHIBIT: EX-102
+  TITLE: Inspection Report IR-2219
+  [SPAN EX-102-1]
   MERIDIAN COMPONENTS LTD - Inspection Report IR-2219. Lot HX-17.
-  [SPAN EX-101-2]
+  [SPAN EX-102-2]
   Final inspection completed 2026-03-19, prior to acceptance.</pre>
       </details>
     </section>
@@ -241,6 +281,7 @@ Worked example:
     <div id="seal-modal" class="modal card" role="dialog" aria-modal="true" aria-labelledby="seal-modal-title">
       <h2 id="seal-modal-title">Sealed session receipt</h2>
       <div id="receipt-summary" class="receipt-summary"></div>
+      <p class="hint">Tamper-evident, not tamper-proof — and not an authoritative legal signature.</p>
       <details class="raw-receipt-disclosure">
         <summary>VIEW RAW SIGNED JSON</summary>
         <pre id="seal-receipt-preview" class="receipt-preview"></pre>

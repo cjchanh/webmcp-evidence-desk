@@ -275,7 +275,9 @@ export async function verifySealedReceiptEnvelope(
   }
   if (opts?.manifestExhibits && Array.isArray(receipt.accepted_evidence)) {
     const byId = new Map(opts.manifestExhibits.map((m) => [m.id, m]))
-    let anchored = receipt.accepted_evidence.length > 0
+    // Vacuous anchoring: a DECLINED receipt seals zero accepted evidence by
+    // design — an empty list is anchored (nothing to check), not a failure.
+    let anchored = true
     for (const item of receipt.accepted_evidence) {
       const manifestExhibit = byId.get(item.exhibit_id)
       if (!manifestExhibit) {

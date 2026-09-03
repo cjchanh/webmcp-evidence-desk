@@ -32,7 +32,8 @@ import {
   type PendingHumanDecision,
   type RecordedHumanDecision
 } from './domain/decision.ts'
-import { sha256Hex } from './domain/hex.ts'
+import { sha256Hex, bytesToHex } from './domain/hex.ts'
+import { manifestSigningPayload } from './domain/manifestPayload.ts'
 import type {
   BoardState,
   ClaimEvaluation,
@@ -122,6 +123,7 @@ function byId<T extends HTMLElement>(id: string): T {
 const els = {
   webmcpStatus: byId<HTMLSpanElement>('webmcp-status'),
   clusterStatus: byId<HTMLSpanElement>('agent-cluster-status'),
+  manifestFingerprint: byId<HTMLSpanElement>('manifest-fingerprint'),
   banner: byId<HTMLDivElement>('unsupported-banner'),
   bannerSim: byId<HTMLButtonElement>('btn-run-sim-banner'),
   copyBtn: byId<HTMLButtonElement>('btn-copy-judge-prompt'),
@@ -354,6 +356,7 @@ function applyVerdict(evaluation: ClaimEvaluation): void {
 
 function invalidateHumanDecision(message: string): void {
   if (!state.humanDecision) return
+  const prior = state.humanDecision
   state.humanDecision = null
   state.pendingDecision =
     state.verdict === 'PENDING'
@@ -363,7 +366,13 @@ function invalidateHumanDecision(message: string): void {
     setVerdict(els.verdictStamp, { verdict: state.verdict, missing: [] })
   }
   setDecisionButtons(state.verdict === 'PENDING')
-  els.verdictAcceptStatus.textContent = message
+  // A recorded decision (especially a CORRECTED one) is void on any evidence
+  // or proposal change — say so explicitly instead of silently reverting the
+  // stamp to the agent's original verdict.
+  els.verdictAcceptStatus.textContent =
+    prior.status === 'CORRECTED'
+      ? `Prior correction (${prior.agentVerdict} → ${prior.finalVerdict}) is void — the evidence changed. ${message}`
+      : message
   setReviewStatus('NEEDS APPROVAL', 'Evidence changed. Review the proposal and record a new human decision.')
 }
 
@@ -571,8 +580,12 @@ async function sealReceipt(): Promise<void> {
       passed: qualitySignals.filter(Boolean).length,
       total: qualitySignals.length
     }
+    // Confidence describes the SEALED verdict (the human's final word), not
+    // the agent's proposal — a corrected verdict must not carry the agent's
+    // abstention basis into the receipt.
+    const sealedVerdict = state.humanDecision.finalVerdict ?? state.humanDecision.agentVerdict
     const evidenceConfidence =
-      state.verdict === 'INSUFFICIENT'
+      sealedVerdict === 'INSUFFICIENT'
         ? {
             level: 'LOW' as const,
             basis: 'The evaluator abstained because the verified record is incomplete.'
@@ -600,8 +613,8 @@ async function sealReceipt(): Promise<void> {
         verdict: state.humanDecision.finalVerdict ?? state.humanDecision.agentVerdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
-        manifestPublicKey: (userManifest ?? MANIFEST).publicKey,
-        manifestSignature: (userManifest ?? MANIFEST).signature,
+        manifestPublicKey: activeManifest().publicKey,
+        manifestSignature: activeManifest().signature,
         humanDecision: state.humanDecision,
         priorBoardDigest,
         qualityChecks,
@@ -666,10 +679,10 @@ async function verifyLastReceipt(): Promise<void> {
   if (!state.lastReceipt) return
   els.receiptVerifyStatus.textContent = 'VERIFYING RECEIPT…'
   setWaxSeal(false)
-  const activeManifest = userManifest ?? MANIFEST
+  const manifest = activeManifest()
   const result = await verifySealedReceiptEnvelope(state.lastReceipt, {
-    manifestExhibits: activeManifest.exhibits,
-    expectedManifestPublicKey: activeManifest.publicKey
+    manifestExhibits: manifest.exhibits,
+    expectedManifestPublicKey: manifest.publicKey
   })
   const pass = result.signatureValid === true && result.hashesAnchoredInManifest === true
   if (pass) {
@@ -732,9 +745,22 @@ function trapModalFocus(e: KeyboardEvent, backdrop: HTMLElement): void {
 const FORGE_TARGET_ID = 'EX-002'
 let lastFocusedBeforeForge: HTMLElement | null = null
 
+/** The manifest the session is actually adjudicating: the user's BYOE packet
+ *  when one is loaded, the shipped synthetic packet otherwise. The forge bench
+ *  and case reset must both operate on THIS manifest — forging or resetting
+ *  against the shipped packet while a user packet is active would quarantine
+ *  exhibits the session never had. */
+function activeManifest(): EvidenceManifest {
+  return userManifest ?? MANIFEST
+}
+
 function openForgeBench(): void {
-  const base = MANIFEST.exhibits.find((e) => e.id === FORGE_TARGET_ID)
-  if (!base) return
+  const base = activeManifest().exhibits.find((e) => e.id === FORGE_TARGET_ID)
+  if (!base) {
+    els.forgeStatus.textContent =
+      'EX-002 is not in the active evidence set — the bench forges the shipped case exhibit only.'
+    return
+  }
   // The bench always loads the PRISTINE signed spans from the manifest —
   // never session state — so every attempt starts from what was signed.
   els.forgeBenchTitle.textContent = `Forgery bench — ${base.id} · ${base.title}`
@@ -769,7 +795,7 @@ function closeForgeBench(): void {
 }
 
 async function submitForgery(): Promise<void> {
-  const base = MANIFEST.exhibits.find((e) => e.id === FORGE_TARGET_ID)
+  const base = activeManifest().exhibits.find((e) => e.id === FORGE_TARGET_ID)
   if (!base) return
   if (state.quarantinedIds.has(FORGE_TARGET_ID)) {
     els.forgeStatus.textContent =
@@ -825,7 +851,7 @@ async function submitForgery(): Promise<void> {
 /** RESET CASE: pristine board, PENDING verdict, original verified exhibits. */
 async function resetCase(): Promise<void> {
   try {
-    const report = await verifyManifest(MANIFEST)
+    const report = await verifyManifest(activeManifest())
     state.verified = report.verified
     state.quarantinedIds = new Set(report.quarantined.map((q) => q.exhibit_id))
     state.forged = []
@@ -893,7 +919,22 @@ async function loadUserManifest(manifest: EvidenceManifest, privateKey: Uint8Arr
   setReviewStatus('INITIAL', 'Copy the briefing to start a real WebMCP review.')
   renderGrid()
   renderTimeline(els.timeline, state.verified)
+  updateManifestFingerprint(manifest)
   log('SYS', `USER EVIDENCE SIGNED — ${report.verified.length} exhibits verified locally`)
+}
+
+/** Topbar badge: sha256 over the manifest's signed structure — the page
+ *  addresses itself by the exact bytes it is adjudicating. The full digest
+ *  stays out of the DOM (the no-key-leak contract covers all 64-hex strings);
+ *  the title carries the same 12-char prefix shown in the badge. */
+function updateManifestFingerprint(manifest: EvidenceManifest): void {
+  const digest = sha256Hex(bytesToHex(manifestSigningPayload(manifest.exhibits)))
+  void digest.then((hex) => {
+    const short = hex.slice(0, 12)
+    els.manifestFingerprint.textContent = `MANIFEST: ${short}…`
+    els.manifestFingerprint.className = 'badge badge-ok'
+    els.manifestFingerprint.title = `sha256 of the signed manifest structure: ${short}…`
+  })
 }
 
 async function signUserEvidence(): Promise<void> {
@@ -913,7 +954,14 @@ async function signUserEvidence(): Promise<void> {
     return
   }
   const { manifest, privateKey } = await buildUserManifest(exhibits)
+  const before = userManifest
   await loadUserManifest(manifest, privateKey)
+  // Fail-closed guard: a freshly built manifest always verifies, but if the
+  // load was refused for any reason the refusal copy must survive.
+  if (userManifest === before) {
+    log('ERR', 'user evidence not loaded — verification refused it')
+    return
+  }
   setUserEvidenceStatus(
     `SIGNED LOCALLY — ${exhibits.length} exhibits · keypair generated in this browser · nothing uploaded`
   )
@@ -948,7 +996,14 @@ async function importUserManifestPacket(): Promise<void> {
     setUserEvidenceStatus(`IMPORT FAILED — ${result.error}`)
     return
   }
+  const before = userManifest
   await loadUserManifest(result.manifest, result.privateKey)
+  // Fail-closed guard: loadUserManifest refuses invalid packets by leaving the
+  // active manifest untouched — never overwrite that refusal with success copy.
+  if (userManifest === before) {
+    log('ERR', 'user manifest packet not loaded — verification refused it')
+    return
+  }
   setUserEvidenceStatus(
     `LOADED — ${result.manifest.exhibits.length} exhibits · keypair restored from packet · nothing uploaded`
   )
@@ -995,6 +1050,7 @@ async function bootInner(): Promise<void> {
   } else {
     log('SYS', `SIG VERIFIED — ${report.verified.length} exhibits intact`)
   }
+  updateManifestFingerprint(MANIFEST)
 
   renderGrid()
   renderTimeline(els.timeline, state.verified)
