@@ -17,18 +17,30 @@
 import { throwIfAborted } from './errors.ts'
 import type { ClaimEvaluation, ClaimReason, Exhibit, Span } from './types.ts'
 
+export const CONTESTED_CLAIM =
+  'Did the vendor provide the required inspection report before acceptance?'
+
+const normalizeClaim = (claim: string): string =>
+  claim.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+const NORMALIZED_CONTESTED_CLAIM = normalizeClaim(CONTESTED_CLAIM)
+
 // Lookarounds reject 5+ digit year fragments ("10000-01-01" must not yield
 // "0000-01-01" via substring match — cycle-2 fuzz finding).
 const ISO_DATE = /(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)/
 
-/** Calendar sanity: month 01-12, day 01-31. "2026-99-99" is not a date and
- *  must never anchor a confident verdict. */
+/** Gregorian calendar validation. Impossible dates must never anchor a
+ * confident verdict. */
 function isValidIsoDate(s: string): boolean {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
   if (!m) return false
+  const year = Number(m[1])
   const month = Number(m[2])
   const day = Number(m[3])
-  return month >= 1 && month <= 12 && day >= 1 && day <= 31
+  if (month < 1 || month > 12) return false
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  return day >= 1 && day <= (daysInMonth[month - 1] ?? 0)
 }
 
 /**
@@ -131,7 +143,13 @@ const DOC_TYPE_TITLE_RE: Record<string, RegExp> = {
  * abstains INSUFFICIENT, naming implicated document types that are absent
  * from the corpus (or the general gap when everything implicated exists).
  */
-const ADJUDICATED_CLASS_RE = /inspect|accept|attest/i
+function isAdjudicatedClaim(claim: string): boolean {
+  const normalized = normalizeClaim(claim)
+  return (
+    normalized === NORMALIZED_CONTESTED_CLAIM ||
+    normalized === `inspect ${NORMALIZED_CONTESTED_CLAIM}`
+  )
+}
 
 export function evaluateClaim(
   claim: string,
@@ -149,7 +167,7 @@ export function evaluateClaim(
     if (kw.re.test(claim)) implicatedDocTypes.add(kw.docType)
   }
 
-  if (!ADJUDICATED_CLASS_RE.test(claim)) {
+  if (!isAdjudicatedClaim(claim)) {
     const corpusTitles = exhibits.map((e) => e.title).join(' | ')
     const missing = [...implicatedDocTypes].filter((docType) => {
       const titleRe = DOC_TYPE_TITLE_RE[docType]
@@ -214,14 +232,6 @@ export function evaluateClaim(
       const hit = findDatedSpan(r, PERFORMED_RE)
       return hit ? [{ report: r, hit }] : []
     })
-    if (dated.length === 0) {
-      return {
-        verdict: 'INSUFFICIENT',
-        reasons: [],
-        missing: dedupe(['dated inspection report'])
-      }
-    }
-
     const after = dated.filter((d) => d.hit.date > acceptanceHit.date)
     if (after.length > 0) {
       const reasons: ClaimReason[] = after.map((d) => ({
@@ -240,6 +250,21 @@ export function evaluateClaim(
         })
       }
       return { verdict: 'CONTRADICTED', reasons, missing: [] }
+    }
+
+    // A positive verdict requires every report to carry a usable performance
+    // date. Known after-acceptance evidence above is already conclusive, but an
+    // undated report must never be silently ignored on the SUPPORTED path.
+    if (dated.length !== reports.length) {
+      return {
+        verdict: 'INSUFFICIENT',
+        reasons: [],
+        missing: dedupe([
+          reports.length === 1
+            ? 'dated inspection report'
+            : 'dated inspection report for every report'
+        ])
+      }
     }
 
     const latest = dated.reduce((a, b) => (b.hit.date > a.hit.date ? b : a))

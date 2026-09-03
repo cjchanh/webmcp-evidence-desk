@@ -34,6 +34,7 @@ describe('real WebMCP flow through the live page', () => {
         'WEBMCP: ACTIVE (4 TOOLS)'
       )
     })
+    expect(document.getElementById('provenance-mode')?.textContent).toBe('LIVE')
     expect(registered).toHaveLength(4)
 
     const byName = Object.fromEntries(registered.map((tool) => [tool.name, tool]))
@@ -72,6 +73,16 @@ describe('real WebMCP flow through the live page', () => {
     expect(approve.disabled).toBe(false)
     expect(correct.disabled).toBe(false)
     expect(decline.disabled).toBe(false)
+
+    approve.click()
+    ;(document.getElementById('btn-seal-receipt') as HTMLButtonElement).click()
+    await vi.waitFor(() => {
+      expect(document.getElementById('seal-status')?.textContent).toBe(
+        'SEAL REFUSED — pin at least one signature-verified exhibit before adopting a verdict.'
+      )
+    })
+    expect(document.getElementById('seal-modal-backdrop')?.hidden).toBe(true)
+
     for (const exhibitId of ['EX-001', 'EX-002']) {
       const pin = document.querySelector<HTMLButtonElement>(
         `[data-exhibit-id="${exhibitId}"] .control-row button`
@@ -150,5 +161,10 @@ describe('real WebMCP flow through the live page', () => {
     expect(declinedSummary).toContain(
       'Evidence confidence: LOW — No evidence was explicitly pinned by the human.'
     )
+
+    ;(document.getElementById('btn-run-sim-inline') as HTMLButtonElement).click()
+    await vi.waitFor(() => {
+      expect(document.getElementById('provenance-mode')?.textContent).toBe('MIXED')
+    })
   })
 })

@@ -49,6 +49,7 @@ describe('user evidence UI through the live page', () => {
     expect(document.getElementById('webmcp-status')?.textContent).toBe(
       'WEBMCP: UNAVAILABLE'
     )
+    expect(document.getElementById('provenance-mode')?.textContent).toBe('SIMULATED')
   })
 
   it('all new user-evidence ids exist exactly once', () => {

@@ -78,7 +78,7 @@ npm install
 npm run build:manifest   # signs the exhibit manifest; private key -> gitignored keys/
 npm run dev              # local dev server
 
-npm test                 # vitest suite (168 tests)
+npm test                 # vitest suite (183 tests)
 npm run build            # production build -> dist/
 npm run typecheck        # tsc --noEmit
 ```
@@ -109,7 +109,7 @@ tests/                       vitest: unit, live-page WebMCP execution, UI contra
 
 ## Deployment notes
 
-`public/_headers` sets `Origin-Agent-Cluster: ?1` and `Permissions-Policy: tools=self` (Cloudflare Pages format); the Vercel deployment carries the same directives via `vercel.json`. Runtime code additionally checks `window.originAgentCluster` rather than trusting headers alone. WebMCP requires Chrome 149+ (flag: `chrome://flags/#enable-webmcp-testing`).
+`public/_headers` carries the static-host header contract, and the tracked root `vercel.json` makes the Vercel build and all seven security headers reproducible from the public repository. Deploy from the repository root so Vercel runs `npm run build` and serves `dist/`. Runtime code additionally checks `window.originAgentCluster` rather than trusting headers alone. WebMCP requires Chrome 149+ (flag: `chrome://flags/#enable-webmcp-testing`).
 
 ## The 20-second judge path
 

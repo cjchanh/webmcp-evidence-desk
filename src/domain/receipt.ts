@@ -132,6 +132,13 @@ export async function buildSealedReceipt(
 ): Promise<SealedReceiptEnvelope> {
   throwIfAborted(opts?.signal)
 
+  if (!input.humanDecision) {
+    throw new TypeError('seal requires a recorded human decision')
+  }
+  if (input.humanDecision.status !== 'DECLINED' && input.acceptedEvidence.length === 0) {
+    throw new TypeError('an approved or corrected receipt requires at least one accepted exhibit')
+  }
+
   const humanDecision: HumanDecisionReceipt | undefined = input.humanDecision
     ? {
         status: input.humanDecision.status,
@@ -264,7 +271,62 @@ export async function verifySealedReceiptEnvelope(
   // supplies the authentic exhibit list.
   const receipt = env.receipt as {
     accepted_evidence?: Array<{ exhibit_id: string; span_sha256s?: string[] }>
+    human_decision?: {
+      status?: unknown
+      agent_verdict?: unknown
+      final_verdict?: unknown
+      rationale?: unknown
+    }
     manifest_public_key?: string
+    verdict?: unknown
+  }
+  if (!receipt.human_decision || typeof receipt.human_decision !== 'object') {
+    problems.push('receipt has no recorded human decision')
+  } else {
+    const decision = receipt.human_decision
+    const status = decision.status
+    const validVerdicts = new Set<Verdict>(['SUPPORTED', 'CONTRADICTED', 'INSUFFICIENT'])
+    if (status !== 'APPROVED' && status !== 'CORRECTED' && status !== 'DECLINED') {
+      problems.push('receipt has an invalid human decision status')
+    } else if (status === 'DECLINED') {
+      if (decision.final_verdict !== null || receipt.verdict !== 'DECLINED') {
+        problems.push('declined decision must seal verdict DECLINED')
+      }
+    } else {
+      if (!validVerdicts.has(decision.final_verdict as Verdict)) {
+        problems.push('adopted decision has an invalid final verdict')
+      } else if (receipt.verdict !== decision.final_verdict) {
+        problems.push('sealed verdict does not match the human final verdict')
+      }
+      if (status === 'APPROVED' && decision.final_verdict !== decision.agent_verdict) {
+        problems.push('approved decision must preserve the agent verdict')
+      }
+      if (status === 'CORRECTED') {
+        if (decision.final_verdict === decision.agent_verdict) {
+          problems.push('corrected decision must change the agent verdict')
+        }
+        if (typeof decision.rationale !== 'string' || decision.rationale.trim().length === 0) {
+          problems.push('corrected decision requires a rationale')
+        }
+      }
+    }
+  }
+  if (!Array.isArray(receipt.accepted_evidence)) {
+    problems.push('receipt accepted_evidence is not an array')
+  } else {
+    if (
+      receipt.human_decision?.status !== 'DECLINED' &&
+      receipt.accepted_evidence.length === 0
+    ) {
+      problems.push('adopted verdict has no accepted evidence')
+    }
+    for (const item of receipt.accepted_evidence) {
+      if (!Array.isArray(item.span_sha256s) || item.span_sha256s.length === 0) {
+        problems.push(
+          `accepted exhibit ${String(item.exhibit_id).slice(0, 64)} has no span hashes`
+        )
+      }
+    }
   }
   if (
     opts?.expectedManifestPublicKey &&
@@ -273,12 +335,18 @@ export async function verifySealedReceiptEnvelope(
     result.hashesAnchoredInManifest = false
     problems.push('receipt chains to a manifest public key that is not the shipped one')
   }
-  if (opts?.manifestExhibits && Array.isArray(receipt.accepted_evidence)) {
+  if (opts?.manifestExhibits && !Array.isArray(receipt.accepted_evidence)) {
+    result.hashesAnchoredInManifest = false
+  } else if (opts?.manifestExhibits && Array.isArray(receipt.accepted_evidence)) {
     const byId = new Map(opts.manifestExhibits.map((m) => [m.id, m]))
     // Vacuous anchoring: a DECLINED receipt seals zero accepted evidence by
     // design — an empty list is anchored (nothing to check), not a failure.
     let anchored = true
     for (const item of receipt.accepted_evidence) {
+      if (!Array.isArray(item.span_sha256s) || item.span_sha256s.length === 0) {
+        anchored = false
+        continue
+      }
       const manifestExhibit = byId.get(item.exhibit_id)
       if (!manifestExhibit) {
         anchored = false

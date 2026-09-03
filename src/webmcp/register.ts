@@ -13,7 +13,7 @@
 
 import { searchExhibits } from '../domain/search.ts'
 import { inspectExhibit } from '../domain/inspect.ts'
-import { evaluateClaim } from '../domain/evaluate.ts'
+import { CONTESTED_CLAIM, evaluateClaim } from '../domain/evaluate.ts'
 import { applyAgentAction, boardSummary, type ActionResult } from '../domain/board.ts'
 import { isAbortError, throwIfAborted } from '../domain/errors.ts'
 import type {
@@ -362,7 +362,7 @@ export function buildToolDefs(ctx: ToolContext): WebMcpToolDefinition[] {
         'Deterministic verdict SUPPORTED | CONTRADICTED | INSUFFICIENT for a claim against verified evidence. Reasons are span-tied; abstentions name the missing document type.',
       inputSchema: {
         type: 'object',
-        properties: { claim: { type: 'string' } },
+        properties: { claim: { type: 'string', enum: [CONTESTED_CLAIM] } },
         required: ['claim']
       },
       execute: evaluateExecute,

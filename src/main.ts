@@ -10,6 +10,7 @@
 import './ui/styles.css'
 import { MANIFEST } from './generated/manifest.ts'
 import { verifyManifest } from './domain/verify.ts'
+import { CONTESTED_CLAIM } from './domain/evaluate.ts'
 import {
   applyAgentAction,
   applyHumanAction,
@@ -62,14 +63,12 @@ import { renderTimeline } from './ui/timeline.ts'
 import { el } from './ui/dom.ts'
 import { ed25519 } from '@noble/curves/ed25519.js'
 
-const HERO_CLAIM = 'Did the vendor provide the required inspection report before acceptance?'
-
 // Self-contained: embeds the claim so it works even where this page's tools
 // are unreachable, names the exact tools, and sets the expectation line so a
 // judge knows what should happen after pasting.
 const JUDGE_PROMPT = [
   'Review this contested procurement claim using the Evidence Desk page open in your agent browser:',
-  `CLAIM: "${HERO_CLAIM}"`,
+  `CLAIM: "${CONTESTED_CLAIM}"`,
   'Use the page\'s WebMCP tools:',
   '1. search_evidence — find relevant exhibits.',
   '2. inspect_exhibit — read exact source spans (start with EX-001, EX-002).',
@@ -128,6 +127,9 @@ const els = {
   bannerSim: byId<HTMLButtonElement>('btn-run-sim-banner'),
   copyBtn: byId<HTMLButtonElement>('btn-copy-judge-prompt'),
   copyFeedback: byId<HTMLSpanElement>('copy-feedback'),
+  judgePromptManual: byId<HTMLDetailsElement>('judge-prompt-manual'),
+  judgePromptText: byId<HTMLTextAreaElement>('judge-prompt-text'),
+  provenanceMode: byId<HTMLSpanElement>('provenance-mode'),
   reviewStatus: byId<HTMLElement>('review-status'),
   reviewStatusDetail: byId<HTMLElement>('review-status-detail'),
   verdictStamp: byId<HTMLDivElement>('verdict-stamp'),
@@ -176,6 +178,24 @@ const els = {
   exportUserManifestBtn: byId<HTMLButtonElement>('btn-export-user-manifest'),
   importUserManifestBtn: byId<HTMLButtonElement>('btn-import-user-manifest'),
   userEvidenceStatus: byId<HTMLSpanElement>('user-evidence-status')
+}
+
+type ProvenanceMode = 'CHECKING' | 'LIVE' | 'DEGRADED' | 'SIMULATED' | 'FAILED'
+let baseProvenanceMode: ProvenanceMode = 'CHECKING'
+let simulatedActivity = false
+
+function setProvenanceMode(mode: ProvenanceMode): void {
+  baseProvenanceMode = mode
+  els.provenanceMode.textContent =
+    simulatedActivity && (mode === 'LIVE' || mode === 'DEGRADED') ? 'MIXED' : mode
+}
+
+function markSimulatedActivity(): void {
+  simulatedActivity = true
+  els.provenanceMode.textContent =
+    baseProvenanceMode === 'LIVE' || baseProvenanceMode === 'DEGRADED'
+      ? 'MIXED'
+      : 'SIMULATED'
 }
 
 // --- logging ----------------------------------------------------------------
@@ -465,6 +485,7 @@ async function runSimulated(): Promise<void> {
     return
   }
   simRunning = true
+  markSimulatedActivity()
   els.simRibbon.hidden = false
   setReviewStatus('LOADING', 'Guided replay is simulated and does not count as WebMCP proof.')
   try {
@@ -490,24 +511,46 @@ async function runSimulated(): Promise<void> {
 // --- judge prompt copy ------------------------------------------------------
 
 async function copyJudgePrompt(): Promise<void> {
+  let copied = false
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(JUDGE_PROMPT)
-    } else {
-      const ta = document.createElement('textarea')
+      copied = true
+    }
+  } catch {
+    // Clipboard permissions vary across agent browsers. Try the legacy path,
+    // then expose the exact briefing for manual copy if both are blocked.
+  }
+  if (!copied) {
+    let ta: HTMLTextAreaElement | null = null
+    try {
+      ta = document.createElement('textarea')
       ta.value = JUDGE_PROMPT
       ta.setAttribute('readonly', 'true')
       ta.style.position = 'fixed'
       ta.style.left = '-9999px'
       document.body.appendChild(ta)
+      ta.focus()
       ta.select()
-      document.execCommand('copy')
-      ta.remove()
+      ta.setSelectionRange(0, ta.value.length)
+      copied = document.execCommand?.('copy') === true
+    } catch {
+      copied = false
+    } finally {
+      ta?.remove()
     }
+  }
+  if (copied) {
+    els.judgePromptManual.hidden = true
     els.copyFeedback.textContent =
       'PROMPT COPIED — paste into your agent with this page open; expect tool calls to appear in the log'
-  } catch {
-    els.copyFeedback.textContent = 'COPY FAILED — GRANT CLIPBOARD PERMISSION OR COPY FROM README'
+  } else {
+    els.judgePromptManual.hidden = false
+    els.judgePromptManual.open = true
+    els.judgePromptText.focus()
+    els.judgePromptText.select()
+    els.copyFeedback.textContent =
+      'AUTOMATIC COPY BLOCKED — COPY THE SELECTED BRIEFING BELOW'
   }
   setTimeout(() => {
     els.copyFeedback.textContent = ''
@@ -562,6 +605,13 @@ async function sealReceipt(): Promise<void> {
   for (const r of refused) {
     log('ERR', `seal excluded ${r.exhibit_id}: ${r.reason}`)
   }
+  if (state.humanDecision.status !== 'DECLINED' && accepted.length === 0) {
+    showSealStatus(
+      'SEAL REFUSED — pin at least one signature-verified exhibit before adopting a verdict.'
+    )
+    log('ERR', 'seal refused: adopted verdict has no pinned evidence')
+    return
+  }
   if (refused.length > 0) {
     showSealStatus(`SEAL PARTIAL — ${refused.length} board entries lacked SIG VERIFIED and were excluded.`)
   }
@@ -609,7 +659,7 @@ async function sealReceipt(): Promise<void> {
       {
         sealedAt: new Date().toISOString(),
         sessionId: sessionId(),
-        claimText: HERO_CLAIM,
+        claimText: CONTESTED_CLAIM,
         verdict: state.humanDecision.finalVerdict ?? state.humanDecision.agentVerdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
@@ -684,7 +734,10 @@ async function verifyLastReceipt(): Promise<void> {
     manifestExhibits: manifest.exhibits,
     expectedManifestPublicKey: manifest.publicKey
   })
-  const pass = result.signatureValid === true && result.hashesAnchoredInManifest === true
+  const pass =
+    result.signatureValid === true &&
+    result.hashesAnchoredInManifest === true &&
+    result.problems.length === 0
   if (pass) {
     els.receiptVerifyStatus.textContent =
       'RECEIPT VERIFY PASS — internal signature valid; accepted hashes anchored in the signed manifest'
@@ -1022,6 +1075,7 @@ async function boot(): Promise<void> {
     log('ERR', `boot failed: ${(err as Error)?.message ?? String(err)}`)
     els.verdictStamp.textContent = 'BOOT FAILED — evidence could not be verified'
     els.webmcpStatus.textContent = 'WEBMCP: OFFLINE'
+    setProvenanceMode('FAILED')
     setReviewStatus('FAILED', 'Evidence verification failed. Reload to retry.')
     showSealStatus('BOOT FAILED — reload or run the simulated review.')
   }
@@ -1092,6 +1146,7 @@ async function bootInner(): Promise<void> {
 
   if (!registration.supported) {
     els.webmcpStatus.textContent = 'WEBMCP: UNAVAILABLE'
+    setProvenanceMode('SIMULATED')
     els.banner.hidden = false
     log('SYS', 'document.modelContext absent — tools not registered; simulated lane available')
     return
@@ -1100,9 +1155,11 @@ async function bootInner(): Promise<void> {
   const failures = registration.outcomes.filter((o) => !o.ok)
   if (failures.length === 0) {
     els.webmcpStatus.textContent = 'WEBMCP: ACTIVE (4 TOOLS)'
+    setProvenanceMode('LIVE')
     els.webmcpStatus.className = 'badge badge-active'
   } else {
     els.webmcpStatus.textContent = `WEBMCP: DEGRADED (${failures.length} FAILED)`
+    setProvenanceMode('DEGRADED')
     els.webmcpStatus.className = 'badge badge-fail'
   }
   for (const outcome of registration.outcomes) {
@@ -1117,6 +1174,7 @@ async function bootInner(): Promise<void> {
 
 // --- wiring -----------------------------------------------------------------
 
+els.judgePromptText.value = JUDGE_PROMPT
 els.copyBtn.addEventListener('click', () => void copyJudgePrompt())
 els.approveVerdictBtn.addEventListener('click', approveVerdict)
 els.correctVerdictBtn.addEventListener('click', openCorrection)

@@ -8,6 +8,7 @@ import {
   buildSealedReceipt,
   verifySealedReceiptEnvelope
 } from '../src/domain/receipt.ts'
+import { bytesToHex, utf8Bytes } from '../src/domain/hex.ts'
 import { searchExhibits } from '../src/domain/search.ts'
 import { verifyManifest } from '../src/domain/verify.ts'
 import { ed25519 } from '@noble/curves/ed25519.js'
@@ -36,7 +37,17 @@ const BASE_INPUT = {
   ],
   toolLog: ['[SYS] boot'],
   manifestPublicKey: 'ff',
-  manifestSignature: 'ee'
+  manifestSignature: 'ee',
+  humanDecision: {
+    status: 'APPROVED' as const,
+    actorRole: 'local-human-reviewer' as const,
+    agentVerdict: 'CONTRADICTED' as const,
+    finalVerdict: 'CONTRADICTED' as const,
+    rationale: null,
+    proposedAt: '2026-08-25T00:00:00.000Z',
+    decidedAt: '2026-08-25T00:00:05.000Z',
+    waitingMs: 5000
+  }
 }
 
 describe('receipt honesty (cycle-3)', () => {
@@ -67,6 +78,39 @@ describe('receipt honesty (cycle-3)', () => {
     expect(envelope.receipt.session_id).toBe('sess-123')
     expect(envelope.receipt.note).toMatch(/not proof of origin/)
   })
+
+  it('refuses to seal without a recorded human decision', async () => {
+    await expect(
+      buildSealedReceipt({ ...BASE_INPUT, humanDecision: undefined }, signer())
+    ).rejects.toThrow('recorded human decision')
+  })
+
+  it.each([
+    {
+      status: 'APPROVED' as const,
+      finalVerdict: 'CONTRADICTED' as const,
+      rationale: null
+    },
+    {
+      status: 'CORRECTED' as const,
+      finalVerdict: 'SUPPORTED' as const,
+      rationale: 'Human correction.'
+    }
+  ])('refuses a $status receipt with zero accepted evidence', async (decision) => {
+    await expect(
+      buildSealedReceipt(
+        {
+          ...BASE_INPUT,
+          acceptedEvidence: [],
+          humanDecision: {
+            ...BASE_INPUT.humanDecision,
+            ...decision
+          }
+        },
+        signer()
+      )
+    ).rejects.toThrow('at least one accepted exhibit')
+  })
 })
 
 describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
@@ -92,6 +136,73 @@ describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
     const result = await verifySealedReceiptEnvelope(tampered)
     expect(result.signatureValid).toBe(false)
     expect(result.problems.length).toBeGreaterThan(0)
+  })
+
+  it('rejects a validly signed adopted receipt with zero accepted evidence', async () => {
+    const localSigner = signer()
+    const envelope = await buildSealedReceipt(BASE_INPUT, localSigner)
+    envelope.receipt.accepted_evidence = []
+    envelope.receipt_signature = bytesToHex(
+      localSigner.sign(utf8Bytes(JSON.stringify(envelope.receipt)))
+    )
+
+    const result = await verifySealedReceiptEnvelope(envelope)
+    expect(result.signatureValid).toBe(true)
+    expect(result.problems).toContain('adopted verdict has no accepted evidence')
+  })
+
+  it('rejects an accepted exhibit with no manifest-anchored span hashes', async () => {
+    const report = await verifyManifest(MANIFEST)
+    const exhibit = report.verified[0]!
+    const localSigner = signer()
+    const envelope = await buildSealedReceipt(
+      {
+        ...BASE_INPUT,
+        acceptedEvidence: [
+          {
+            exhibit_id: exhibit.id,
+            title: exhibit.title,
+            span_sha256s: exhibit.spans.map((span) => span.sha256)
+          }
+        ]
+      },
+      localSigner
+    )
+    envelope.receipt.accepted_evidence[0]!.span_sha256s = []
+    envelope.receipt_signature = bytesToHex(
+      localSigner.sign(utf8Bytes(JSON.stringify(envelope.receipt)))
+    )
+
+    const result = await verifySealedReceiptEnvelope(envelope, {
+      manifestExhibits: report.verified.map((item) => ({ id: item.id, spans: item.spans }))
+    })
+    expect(result.signatureValid).toBe(true)
+    expect(result.hashesAnchoredInManifest).toBe(false)
+    expect(result.problems).toContain(`accepted exhibit ${exhibit.id} has no span hashes`)
+  })
+
+  it('rejects a validly signed DECLINED decision paired with an adopted verdict', async () => {
+    const localSigner = signer()
+    const envelope = await buildSealedReceipt(
+      {
+        ...BASE_INPUT,
+        acceptedEvidence: [],
+        humanDecision: {
+          ...BASE_INPUT.humanDecision,
+          status: 'DECLINED',
+          finalVerdict: null
+        }
+      },
+      localSigner
+    )
+    envelope.receipt.verdict = 'SUPPORTED'
+    envelope.receipt_signature = bytesToHex(
+      localSigner.sign(utf8Bytes(JSON.stringify(envelope.receipt)))
+    )
+
+    const result = await verifySealedReceiptEnvelope(envelope)
+    expect(result.signatureValid).toBe(true)
+    expect(result.problems).toContain('declined decision must seal verdict DECLINED')
   })
 
   it('a DECLINED receipt with zero accepted evidence verifies PASS (vacuous anchoring)', async () => {

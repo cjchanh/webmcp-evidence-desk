@@ -121,6 +121,18 @@ describe('evaluateClaim — verdict correctness', () => {
     expect(evaluation.missing).toContain('pricing or invoice records')
   })
 
+  it.each([
+    'Was the vendor accepted into the preferred supplier program?',
+    'Did the buyer inspect the invoice for arithmetic errors?',
+    'Is the attestation signed by an authorized officer?',
+    'Before the buyer accepted the invoice, did the vendor provide the inspection report to its insurer?'
+  ])('INSUFFICIENT for an unrelated claim containing a hero-domain keyword: %s', (claim) => {
+    const evaluation = evaluateClaim(claim, fixtureExhibits())
+    expect(evaluation.verdict).toBe('INSUFFICIENT')
+    expect(evaluation.reasons).toEqual([])
+    expect(evaluation.missing.length).toBeGreaterThan(0)
+  })
+
   it('rejects empty claims', () => {
     expect(() => evaluateClaim('', fixtureExhibits())).toThrow(TypeError)
   })
@@ -273,6 +285,110 @@ describe('evaluateClaim — verdict correctness', () => {
     const badReportEval = evaluateClaim(HERO_CLAIM, badReport)
     expect(badReportEval.verdict).toBe('INSUFFICIENT')
     expect(badReportEval.missing).toContain('dated inspection report')
+  })
+
+  it('rejects impossible day-of-month and non-leap-year dates', () => {
+    const impossibleAcceptance = [
+      {
+        id: 'EX-O',
+        title: 'Acceptance Certificate AC-7',
+        spans: [
+          { span_id: 'EX-O-1', text: 'The customer accepted Lot HX-17 on 2026-02-31.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-P',
+        title: 'Inspection Report IR-9',
+        spans: [
+          { span_id: 'EX-P-1', text: 'All checks were performed on 2026-02-28.', sha256: 'x' }
+        ]
+      }
+    ]
+    const impossibleAcceptanceEval = evaluateClaim(HERO_CLAIM, impossibleAcceptance)
+    expect(impossibleAcceptanceEval.verdict).toBe('INSUFFICIENT')
+    expect(impossibleAcceptanceEval.missing).toContain('dated acceptance certificate')
+
+    const impossibleReport = [
+      {
+        id: 'EX-Q',
+        title: 'Acceptance Certificate AC-8',
+        spans: [
+          { span_id: 'EX-Q-1', text: 'The customer accepted Lot HX-17 on 2025-03-01.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-R',
+        title: 'Inspection Report IR-10',
+        spans: [
+          { span_id: 'EX-R-1', text: 'All checks were performed on 2025-02-29.', sha256: 'x' }
+        ]
+      }
+    ]
+    const impossibleReportEval = evaluateClaim(HERO_CLAIM, impossibleReport)
+    expect(impossibleReportEval.verdict).toBe('INSUFFICIENT')
+    expect(impossibleReportEval.missing).toContain('dated inspection report')
+  })
+
+  it('abstains when any inspection report lacks a dated performance statement', () => {
+    const exhibits = [
+      {
+        id: 'EX-S',
+        title: 'Acceptance Certificate AC-9',
+        spans: [
+          { span_id: 'EX-S-1', text: 'The customer accepted Lot HX-17 on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-T',
+        title: 'Inspection Report IR-11',
+        spans: [
+          { span_id: 'EX-T-1', text: 'All checks were performed on 2026-03-10.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-U',
+        title: 'Inspection Report IR-11 REV B',
+        spans: [
+          {
+            span_id: 'EX-U-1',
+            text: 'This revision records additional inspection work without a dated performance statement.',
+            sha256: 'x'
+          }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('INSUFFICIENT')
+    expect(evaluation.missing).toContain('dated inspection report for every report')
+  })
+
+  it('keeps a dated post-acceptance report conclusive when another revision is undated', () => {
+    const exhibits = [
+      {
+        id: 'EX-V',
+        title: 'Acceptance Certificate AC-10',
+        spans: [
+          { span_id: 'EX-V-1', text: 'The customer accepted Lot HX-17 on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-W',
+        title: 'Inspection Report IR-12',
+        spans: [
+          { span_id: 'EX-W-1', text: 'All checks were performed on 2026-03-19.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-X',
+        title: 'Inspection Report IR-12 REV B',
+        spans: [
+          { span_id: 'EX-X-1', text: 'This revision has no dated performance statement.', sha256: 'x' }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('CONTRADICTED')
+    expect(evaluation.reasons.some((reason) => reason.exhibit_id === 'EX-W')).toBe(true)
   })
 })
 

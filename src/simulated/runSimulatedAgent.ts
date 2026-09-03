@@ -9,7 +9,7 @@
 
 import { searchExhibits } from '../domain/search.ts'
 import { inspectExhibit } from '../domain/inspect.ts'
-import { evaluateClaim } from '../domain/evaluate.ts'
+import { CONTESTED_CLAIM, evaluateClaim } from '../domain/evaluate.ts'
 import { throwIfAborted } from '../domain/errors.ts'
 import type { ActionResult } from '../domain/board.ts'
 import type {
@@ -24,8 +24,6 @@ export interface SimulatedAgentCallbacks {
   onVerdict(verdict: ClaimEvaluation): void
   addToBoard(exhibitId: string, stance: Stance): ActionResult
 }
-
-const HERO_CLAIM = 'Did the vendor provide the required inspection report before acceptance?'
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -76,7 +74,7 @@ export async function runSimulatedAgent(
     await delay(260, signal)
   }
 
-  const evaluation = evaluateClaim(HERO_CLAIM, exhibits, { signal })
+  const evaluation = evaluateClaim(CONTESTED_CLAIM, exhibits, { signal })
   cb.onVerdict(evaluation)
   cb.log(
     `verdict: ${evaluation.verdict.toLowerCase()}` +

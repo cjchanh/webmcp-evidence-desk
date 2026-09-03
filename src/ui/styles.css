@@ -246,6 +246,33 @@ a { color: var(--accent-deep); }
 
 .hint { margin: var(--space-2) 0; }
 
+.judge-prompt-manual {
+  margin: var(--space-3) 0;
+}
+
+.judge-prompt-manual summary {
+  cursor: pointer;
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.judge-prompt-manual textarea {
+  width: 100%;
+  min-height: 11rem;
+  margin-top: var(--space-2);
+  padding: 0.6rem 0.7rem;
+  border: 0.08rem solid var(--line-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-0);
+  color: var(--ink-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
 .trust-strip {
   margin: var(--space-3) 0 0;
   padding-top: var(--space-3);

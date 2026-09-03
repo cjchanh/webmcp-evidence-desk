@@ -58,6 +58,10 @@
           <button id="btn-run-sim-inline" type="button" hidden>WATCH 20-SECOND GUIDED REPLAY</button>
         </div>
         <span id="copy-feedback" class="feedback" role="status"></span>
+        <details id="judge-prompt-manual" class="judge-prompt-manual" hidden>
+          <summary>COPY AGENT BRIEFING MANUALLY</summary>
+          <textarea id="judge-prompt-text" rows="10" readonly aria-label="Agent briefing to copy"></textarea>
+        </details>
         <p class="hint">Copies a self-contained four-tool briefing. Real calls appear in the live record.</p>
         <p id="trust-strip" class="trust-strip" aria-label="Trust summary">13 VERIFIED · 4 WEBMCP TOOLS · HUMAN-ONLY FINAL ACTION</p>
         <p class="hint">Synthetic demo packet — not a legal record. Live WebMCP tool calls require a WebMCP-capable browser (Chrome 149+ with the WebMCP flag); otherwise the labeled simulated replay runs the same domain logic.</p>
@@ -69,7 +73,7 @@
             <p class="eyebrow">PROVENANCE — LIVE TOOL-CALL RECORD</p>
             <h2 id="log-heading">What the agent did</h2>
           </div>
-          <span class="live-mark">LIVE</span>
+          <span id="provenance-mode" class="live-mark">CHECKING</span>
         </div>
         <div class="review-status-shell" aria-live="polite">
           <span id="review-state-signal" class="status-signal" aria-hidden="true">○</span>
