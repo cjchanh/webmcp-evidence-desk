@@ -72,6 +72,13 @@ describe('real WebMCP flow through the live page', () => {
     expect(approve.disabled).toBe(false)
     expect(correct.disabled).toBe(false)
     expect(decline.disabled).toBe(false)
+    for (const exhibitId of ['EX-001', 'EX-002']) {
+      const pin = document.querySelector<HTMLButtonElement>(
+        `[data-exhibit-id="${exhibitId}"] .control-row button`
+      )
+      expect(pin?.textContent).toBe('PIN')
+      pin?.click()
+    }
     ;(document.getElementById('btn-seal-receipt') as HTMLButtonElement).click()
     expect(document.getElementById('seal-status')?.textContent).toBe(
       'SEAL REFUSED — a human must approve, correct, or decline the final verdict first.'
@@ -86,6 +93,9 @@ describe('real WebMCP flow through the live page', () => {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     expect(document.getElementById('verdict-accept-status')?.textContent).toContain(
       'CORRECTED'
+    )
+    expect(document.getElementById('verdict-stamp')?.textContent).toBe(
+      'VERDICT: SUPPORTED'
     )
     expect(approve.disabled).toBe(true)
     expect(correct.disabled).toBe(true)
@@ -104,5 +114,41 @@ describe('real WebMCP flow through the live page', () => {
     expect(summary).toContain('Rejected 0')
     expect(summary).toContain('Evidence integrity: VERIFIED')
     expect(summary).toContain('Quality checks: 6/6')
+
+    ;(document.getElementById('btn-close-modal') as HTMLButtonElement).click()
+    document
+      .querySelector<HTMLButtonElement>('[data-exhibit-id="EX-001"] .control-row button')
+      ?.click()
+    expect(document.getElementById('verdict-stamp')?.textContent).toBe(
+      'VERDICT: CONTRADICTED'
+    )
+    expect(document.getElementById('review-status')?.textContent).toBe('NEEDS APPROVAL')
+
+    for (const exhibitId of ['EX-001', 'EX-002']) {
+      const remove = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          `[data-exhibit-id="${exhibitId}"] .control-row button`
+        )
+      ).find((button) => button.textContent === 'REMOVE')
+      expect(remove).toBeDefined()
+      remove?.click()
+    }
+
+    decline.click()
+    expect(document.getElementById('verdict-stamp')?.textContent).toBe(
+      'VERDICT: NOT ADOPTED'
+    )
+
+    ;(document.getElementById('btn-seal-receipt') as HTMLButtonElement).click()
+    await vi.waitFor(() => {
+      expect(document.getElementById('seal-modal-backdrop')?.hidden).toBe(false)
+    })
+    const declinedSummary = document.getElementById('receipt-summary')?.textContent ?? ''
+    expect(declinedSummary).toContain('Human decision: DECLINED')
+    expect(declinedSummary).toContain('Final verdict: NOT ADOPTED')
+    expect(declinedSummary).toContain('Human accepted 0')
+    expect(declinedSummary).toContain(
+      'Evidence confidence: LOW — No evidence was explicitly pinned by the human.'
+    )
   })
 })

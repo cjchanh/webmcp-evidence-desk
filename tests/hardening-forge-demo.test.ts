@@ -17,7 +17,7 @@ import { resolve } from 'node:path'
 
 import { buildForgedExhibitCandidate, probeForgedExhibit } from '../src/domain/forge.ts'
 import { collectAcceptedEvidence } from '../src/domain/receipt.ts'
-import { applyAgentAction, createBoard } from '../src/domain/board.ts'
+import { applyAgentAction, applyHumanAction, createBoard } from '../src/domain/board.ts'
 import { fixtureExhibits, HERO_CLAIM } from './helpers/fixtures.ts'
 import type { BoardState, Exhibit } from '../src/domain/types.ts'
 
@@ -84,6 +84,9 @@ describe('collectAcceptedEvidence refuses quarantined material', () => {
   it('a forged-and-quarantined board entry is refused with reason "quarantined"', () => {
     let board = add(createBoard(), 'EX-001')
     board = add(board, 'EX-002')
+    const pinned = applyHumanAction(board, { action: 'pin', exhibit_id: 'EX-001' })
+    if (!pinned.ok) throw new Error(pinned.reason)
+    board = pinned.board
     const quarantined = new Set(['EX-002'])
     const { accepted, refused } = collectAcceptedEvidence(board.entries, exhibits, quarantined)
     expect(refused).toEqual([{ exhibit_id: 'EX-002', reason: 'quarantined' }])

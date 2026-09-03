@@ -31,10 +31,10 @@ export interface AcceptedEvidenceItem {
 }
 
 /**
- * Seal-time gate (cycle-1 hardening): only exhibits that are PRESENT in the
- * verified set may enter a sealed receipt. Unknown or quarantined exhibit ids
- * are refused and reported — a receipt can never claim acceptance of evidence
- * that was never SIG VERIFIED.
+ * Seal-time gate (cycle-1 hardening): only exhibits explicitly PINNED by the
+ * human and PRESENT in the verified set may enter a sealed receipt. Unknown or
+ * quarantined exhibit ids are refused and reported — a receipt can never claim
+ * acceptance of evidence that was never SIG VERIFIED or human accepted.
  */
 export function collectAcceptedEvidence(
   boardEntries: ReadonlyArray<{ exhibit_id: string; status: string }>,
@@ -55,6 +55,7 @@ export function collectAcceptedEvidence(
       refused.push({ exhibit_id: entry.exhibit_id, reason: 'not_in_verified_set' })
       continue
     }
+    if (entry.status !== 'pinned') continue
     accepted.push({
       exhibit_id: exhibit.id,
       title: exhibit.title,

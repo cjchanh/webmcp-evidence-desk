@@ -339,6 +339,9 @@ function invalidateHumanDecision(message: string): void {
     state.verdict === 'PENDING'
       ? null
       : createPendingDecision(state.verdict, new Date().toISOString())
+  if (state.verdict !== 'PENDING') {
+    setVerdict(els.verdictStamp, { verdict: state.verdict, missing: [] })
+  }
   setDecisionButtons(state.verdict === 'PENDING')
   els.verdictAcceptStatus.textContent = message
   setReviewStatus('NEEDS APPROVAL', 'Evidence changed. Review the proposal and record a new human decision.')
@@ -354,6 +357,12 @@ function pendingDecision(): PendingHumanDecision | null {
 
 function recordHumanDecision(decision: RecordedHumanDecision): void {
   state.humanDecision = decision
+  if (decision.finalVerdict) {
+    setVerdict(els.verdictStamp, { verdict: decision.finalVerdict, missing: [] })
+  } else {
+    els.verdictStamp.textContent = 'VERDICT: NOT ADOPTED'
+    els.verdictStamp.className = 'verdict-stamp verdict-pending'
+  }
   setDecisionButtons(true)
   els.correctionForm.hidden = true
   els.correctionError.textContent = ''
@@ -548,6 +557,11 @@ async function sealReceipt(): Promise<void> {
             level: 'LOW' as const,
             basis: 'The evaluator abstained because the verified record is incomplete.'
           }
+        : accepted.length === 0
+          ? {
+              level: 'LOW' as const,
+              basis: 'No evidence was explicitly pinned by the human.'
+            }
         : accepted.length >= 2
           ? {
               level: 'HIGH' as const,

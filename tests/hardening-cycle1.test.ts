@@ -25,7 +25,7 @@ describe('collectAcceptedEvidence — the seal gate', () => {
     const { accepted, refused } = collectAcceptedEvidence(
       [
         { exhibit_id: 'EX-999', status: 'proposed' },
-        { exhibit_id: 'EX-001', status: 'proposed' }
+        { exhibit_id: 'EX-001', status: 'pinned' }
       ],
       EXHIBITS,
       new Set()
@@ -33,6 +33,17 @@ describe('collectAcceptedEvidence — the seal gate', () => {
     expect(refused).toEqual([{ exhibit_id: 'EX-999', reason: 'not_in_verified_set' }])
     expect(accepted.map((a) => a.exhibit_id)).toEqual(['EX-001'])
     expect(accepted[0]?.span_sha256s.length).toBe(1)
+  })
+
+  it('does not claim an agent proposal was accepted by a human', () => {
+    const { accepted, refused } = collectAcceptedEvidence(
+      [{ exhibit_id: 'EX-001', status: 'proposed' }],
+      EXHIBITS,
+      new Set()
+    )
+
+    expect(accepted).toEqual([])
+    expect(refused).toEqual([])
   })
 
   it('refuses quarantined exhibits into the accepted list', () => {

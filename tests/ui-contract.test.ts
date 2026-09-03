@@ -222,9 +222,12 @@ describe('appendLog tag contract', () => {
 
 describe('collectAcceptedEvidence → sealed receipt integration', () => {
   it('mixed board gates the receipt to verified non-rejected entries only', async () => {
-    let board = add(createBoard(), 'EX-001', 'supports') // verified → accepted
+    let board = add(createBoard(), 'EX-001', 'supports') // verified proposal
     board = add(board, 'EX-002', 'contradicts') // quarantined → refused below
     board = add(board, 'EX-999', 'supports') // fabricated → refused below
+    const pinned = applyHumanAction(board, { action: 'pin', exhibit_id: 'EX-001' })
+    if (!pinned.ok) throw new Error(pinned.reason)
+    board = pinned.board
     const rejected = applyHumanAction(board, { action: 'reject', exhibit_id: 'EX-003' })
     // EX-003 was never proposed; the refusal itself is the expected path here.
     void rejected
