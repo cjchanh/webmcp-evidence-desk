@@ -74,6 +74,20 @@ describe('real WebMCP execution bridge', () => {
     expect(events.at(-1)?.summary).toContain('human-exclusive')
   })
 
+  it('labels an unknown exhibit_id as refused, not failed', async () => {
+    const app = makeToolContext(exhibits)
+    const events: ToolLifecycleEvent[] = []
+    const inspect = buildToolDefs({
+      ...app.ctx,
+      onLifecycle: (event) => events.push(event)
+    }).find((tool) => tool.name === 'inspect_exhibit')!
+
+    await expect(inspect.execute({ exhibit_id: 'EX-999' })).rejects.toThrow(RangeError)
+
+    expect(events.map((event) => event.phase)).toEqual(['started', 'refused'])
+    expect(events.at(-1)?.summary).toContain('refused')
+  })
+
   it('reports aborts and isolates UI callback failures from tool results', async () => {
     const app = makeToolContext(exhibits)
     const events: ToolLifecycleEvent[] = []

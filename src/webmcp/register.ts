@@ -230,7 +230,10 @@ export function buildToolDefs(ctx: ToolContext): WebMcpToolDefinition[] {
         return result.output
       } catch (err) {
         const aborted = isAbortError(err)
-        const refused = err instanceof TypeError
+        // RangeError (unknown exhibit_id) is a well-formed request the tool
+        // cannot satisfy — label it `refused`, not `failed`, so a normal agent
+        // mistake reads as a refusal rather than a tool crash.
+        const refused = err instanceof TypeError || err instanceof RangeError
         notify({
           toolName,
           phase: aborted ? 'aborted' : refused ? 'refused' : 'failed',
