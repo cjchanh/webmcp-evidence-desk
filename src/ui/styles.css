@@ -404,6 +404,7 @@ button.big {
 .log-tag-human { color: #9ed5b4; }
 .log-tag-sys { color: #c4cbd1; }
 .log-tag-err { color: #f2aaa2; }
+.log-tag-user { color: #a8c9df; }
 
 .date-conflict {
   display: grid;
@@ -829,6 +830,57 @@ button.big {
   font-weight: 600;
 }
 
+.user-evidence-card { border-left: 0.24rem solid var(--accent-calm); }
+
+.user-evidence-card h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.user-evidence-card textarea {
+  width: 100%;
+  min-height: 11rem;
+  padding: 0.6rem 0.7rem;
+  border: 0.08rem solid var(--line-strong);
+  border-radius: 0.35rem;
+  background: var(--surface-0);
+  color: var(--ink-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.user-evidence-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.user-evidence-actions input[type="file"] {
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+.user-evidence-format {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  overflow: auto;
+  background: var(--surface-1);
+  border: 0.08rem solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -987,6 +1039,8 @@ button.big {
   .modal-actions button,
   .seal-actions,
   .seal-actions button { width: 100%; }
+  .user-evidence-actions { align-items: stretch; flex-direction: column; }
+  .user-evidence-actions button { width: 100%; }
   .brand-sub { margin-left: 0; }
 }
 

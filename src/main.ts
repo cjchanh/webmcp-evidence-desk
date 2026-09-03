@@ -17,6 +17,12 @@ import {
 } from './domain/board.ts'
 import { buildSealedReceipt, collectAcceptedEvidence, verifySealedReceiptEnvelope } from './domain/receipt.ts'
 import { buildForgedExhibitCandidate, probeForgedExhibit } from './domain/forge.ts'
+import {
+  buildUserManifest,
+  exportUserManifest,
+  importUserManifest,
+  parseUserDocuments
+} from './domain/userManifest.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
 import {
   approveDecision,
@@ -30,6 +36,7 @@ import { sha256Hex } from './domain/hex.ts'
 import type {
   BoardState,
   ClaimEvaluation,
+  EvidenceManifest,
   Exhibit,
   Verdict
 } from './domain/types.ts'
@@ -98,6 +105,12 @@ const state: AppState = {
   lastReceipt: null
 }
 
+// User-authored evidence: the private key lives ONLY in this module-level
+// variable for the life of the page. Never localStorage, never the DOM, never
+// a log or receipt. Cleared whenever a new manifest is signed or imported.
+let userManifestPrivateKey: Uint8Array | null = null
+let userManifest: EvidenceManifest | null = null
+
 // --- element refs -----------------------------------------------------------
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -153,7 +166,14 @@ const els = {
   forgeEditors: byId<HTMLDivElement>('forge-span-editors'),
   forgeSubmitBtn: byId<HTMLButtonElement>('btn-submit-forgery'),
   forgeCloseBtn: byId<HTMLButtonElement>('btn-close-forge-bench'),
-  forgeStatus: byId<HTMLSpanElement>('forge-status')
+  forgeStatus: byId<HTMLSpanElement>('forge-status'),
+  userEvidenceInput: byId<HTMLTextAreaElement>('user-evidence-input'),
+  userEvidenceFile: byId<HTMLInputElement>('user-evidence-file'),
+  userEvidenceImportFile: byId<HTMLInputElement>('user-evidence-import-file'),
+  signUserEvidenceBtn: byId<HTMLButtonElement>('btn-sign-user-evidence'),
+  exportUserManifestBtn: byId<HTMLButtonElement>('btn-export-user-manifest'),
+  importUserManifestBtn: byId<HTMLButtonElement>('btn-import-user-manifest'),
+  userEvidenceStatus: byId<HTMLSpanElement>('user-evidence-status')
 }
 
 // --- logging ----------------------------------------------------------------
@@ -580,15 +600,17 @@ async function sealReceipt(): Promise<void> {
         verdict: state.humanDecision.finalVerdict ?? state.humanDecision.agentVerdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
-        manifestPublicKey: MANIFEST.publicKey,
-        manifestSignature: MANIFEST.signature,
+        manifestPublicKey: (userManifest ?? MANIFEST).publicKey,
+        manifestSignature: (userManifest ?? MANIFEST).signature,
         humanDecision: state.humanDecision,
         priorBoardDigest,
         qualityChecks,
         evidenceConfidence,
         uncoveredScope: [
           'No external signer identity or authoritative seal-time attestation.',
-          'Synthetic case evidence only; no legal conclusion is asserted.'
+          userManifest
+            ? 'User-supplied evidence signed locally in this browser; no legal conclusion is asserted.'
+            : 'Synthetic case evidence only; no legal conclusion is asserted.'
         ]
       },
       makeEphemeralSigner()
@@ -644,9 +666,10 @@ async function verifyLastReceipt(): Promise<void> {
   if (!state.lastReceipt) return
   els.receiptVerifyStatus.textContent = 'VERIFYING RECEIPT…'
   setWaxSeal(false)
+  const activeManifest = userManifest ?? MANIFEST
   const result = await verifySealedReceiptEnvelope(state.lastReceipt, {
-    manifestExhibits: MANIFEST.exhibits,
-    expectedManifestPublicKey: MANIFEST.publicKey
+    manifestExhibits: activeManifest.exhibits,
+    expectedManifestPublicKey: activeManifest.publicKey
   })
   const pass = result.signatureValid === true && result.hashesAnchoredInManifest === true
   if (pass) {
@@ -831,6 +854,106 @@ async function resetCase(): Promise<void> {
   }
 }
 
+// --- bring your own evidence -------------------------------------------------
+//
+// A user pastes (or loads) plain-text corpus-format documents; the browser
+// generates an Ed25519 keypair, signs a manifest, and verifies it through the
+// SAME verifyManifest path the shipped manifest uses. The private key is held
+// in memory only and never rendered, logged, or persisted.
+
+function setUserEvidenceStatus(text: string): void {
+  els.userEvidenceStatus.textContent = text
+}
+
+/** Replace the active manifest state with a freshly verified user manifest. */
+async function loadUserManifest(manifest: EvidenceManifest, privateKey: Uint8Array): Promise<void> {
+  const report = await verifyManifest(manifest)
+  if (!report.ok || !report.manifestSignatureValid) {
+    log('ERR', 'user evidence refused: manifest signature invalid or verification failed')
+    setUserEvidenceStatus('LOAD REFUSED — signature invalid. Prior case left unchanged.')
+    return
+  }
+  state.verified = report.verified
+  state.quarantinedIds = new Set(report.quarantined.map((q) => q.exhibit_id))
+  state.forged = []
+  state.board = createBoard()
+  state.verdict = 'PENDING'
+  state.pendingDecision = null
+  state.humanDecision = null
+  state.proposalCount = 0
+  pendingArrival.clear()
+  userManifestPrivateKey = privateKey
+  userManifest = manifest
+  els.verdictStamp.textContent = 'VERDICT: PENDING REVIEW'
+  els.verdictStamp.className = 'verdict-stamp verdict-pending'
+  setDecisionButtons(true)
+  els.correctionForm.hidden = true
+  els.abstentionNotice.hidden = true
+  els.verdictAcceptStatus.textContent = 'Awaiting an agent evaluation.'
+  setReviewStatus('INITIAL', 'Copy the briefing to start a real WebMCP review.')
+  renderGrid()
+  renderTimeline(els.timeline, state.verified)
+  log('SYS', `USER EVIDENCE SIGNED — ${report.verified.length} exhibits verified locally`)
+}
+
+async function signUserEvidence(): Promise<void> {
+  const file = els.userEvidenceFile.files?.[0]
+  let rawText = els.userEvidenceInput.value
+  if (file) {
+    rawText = await file.text()
+  }
+  const { exhibits, errors } = parseUserDocuments(rawText)
+  if (errors.length > 0) {
+    for (const err of errors) log('USER', err)
+    setUserEvidenceStatus(`PARSE FAILED — ${errors.length} problem${errors.length === 1 ? '' : 's'}. See the tool log.`)
+    return
+  }
+  if (exhibits.length === 0) {
+    setUserEvidenceStatus('Nothing to sign — no valid exhibits parsed.')
+    return
+  }
+  const { manifest, privateKey } = await buildUserManifest(exhibits)
+  await loadUserManifest(manifest, privateKey)
+  setUserEvidenceStatus(
+    `SIGNED LOCALLY — ${exhibits.length} exhibits · keypair generated in this browser · nothing uploaded`
+  )
+}
+
+function exportUserManifestPacket(): void {
+  if (!userManifest || !userManifestPrivateKey) {
+    setUserEvidenceStatus('Nothing to save yet — sign evidence first.')
+    return
+  }
+  const json = exportUserManifest(userManifest, userManifestPrivateKey)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `evidence-desk-user-manifest-${Date.now()}.json`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+  log('HUMAN', 'user manifest packet downloaded')
+  setUserEvidenceStatus('PACKET SAVED — manifest + private key written to a local .json file.')
+}
+
+async function importUserManifestPacket(): Promise<void> {
+  const file = els.userEvidenceImportFile.files?.[0]
+  if (!file) return
+  const json = await file.text()
+  const result = importUserManifest(json)
+  if ('error' in result) {
+    log('ERR', `user manifest import failed: ${result.error}`)
+    setUserEvidenceStatus(`IMPORT FAILED — ${result.error}`)
+    return
+  }
+  await loadUserManifest(result.manifest, result.privateKey)
+  setUserEvidenceStatus(
+    `LOADED — ${result.manifest.exhibits.length} exhibits · keypair restored from packet · nothing uploaded`
+  )
+}
+
 // --- boot -------------------------------------------------------------------
 
 async function boot(): Promise<void> {
@@ -959,6 +1082,10 @@ els.forgeOpenBtn.addEventListener('click', openForgeBench)
 els.forgeCloseBtn.addEventListener('click', closeForgeBench)
 els.forgeSubmitBtn.addEventListener('click', () => void submitForgery())
 els.forgeResetBtn.addEventListener('click', () => void resetCase())
+els.signUserEvidenceBtn.addEventListener('click', () => void signUserEvidence())
+els.exportUserManifestBtn.addEventListener('click', exportUserManifestPacket)
+els.importUserManifestBtn.addEventListener('click', () => els.userEvidenceImportFile.click())
+els.userEvidenceImportFile.addEventListener('change', () => void importUserManifestPacket())
 
 els.forgeBackdrop.addEventListener('click', (e) => {
   if (e.target === els.forgeBackdrop) closeForgeBench()

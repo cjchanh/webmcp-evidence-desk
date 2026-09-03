@@ -183,6 +183,50 @@
       </div>
     </section>
 
+    <section id="user-evidence-section" class="card user-evidence-card" aria-labelledby="user-evidence-heading">
+      <p class="eyebrow">OPTIONAL · LOAD YOUR OWN CASE</p>
+      <h2 id="user-evidence-heading">Bring your own evidence</h2>
+      <p class="section-copy">
+        Paste plain-text documents in the exhibit format. The browser signs them locally with a keypair generated on this page — nothing is uploaded. Saving a packet writes the local private key into a JSON file on your machine; treat that file as a secret.
+      </p>
+      <textarea id="user-evidence-input" rows="10" spellcheck="false" placeholder="EXHIBIT: EX-101 / TITLE: ... / [SPAN EX-101-1] text..."></textarea>
+      <div class="user-evidence-actions">
+        <input id="user-evidence-file" type="file" accept=".txt,text/plain" />
+        <button id="btn-sign-user-evidence" type="button" class="primary">SIGN &amp; LOAD MY EVIDENCE</button>
+        <button id="btn-export-user-manifest" type="button">SAVE MY SIGNED PACKET</button>
+        <button id="btn-import-user-manifest" type="button">LOAD A SAVED PACKET</button>
+        <input id="user-evidence-import-file" type="file" accept=".json,application/json" hidden />
+      </div>
+      <span id="user-evidence-status" class="feedback" role="alert"></span>
+      <details id="user-evidence-format-help" class="packet-disclosure">
+        <summary>EXHIBIT FORMAT — FULL SPEC + WORKED EXAMPLE</summary>
+        <pre class="user-evidence-format">One or more EXHIBIT blocks, concatenated in a single paste or .txt file.
+
+  EXHIBIT: EX-101
+  TITLE: Vendor Attestation Letter
+  [SPAN EX-101-1]
+  free text, possibly multiple lines
+  [SPAN EX-101-2]
+  more text
+
+Rules:
+  - EXHIBIT id must match EX-[A-Z0-9-]+ (e.g. EX-101, EX-7B).
+  - TITLE is required and non-empty.
+  - [SPAN id] starts a span; the following non-empty lines are its text.
+  - Span ids must be unique within an exhibit.
+  - Hard caps: 20 exhibits, 10 spans per exhibit.
+
+Worked example:
+
+  EXHIBIT: EX-101
+  TITLE: Inspection Report IR-2219
+  [SPAN EX-101-1]
+  MERIDIAN COMPONENTS LTD - Inspection Report IR-2219. Lot HX-17.
+  [SPAN EX-101-2]
+  Final inspection completed 2026-03-19, prior to acceptance.</pre>
+      </details>
+    </section>
+
   </main>
 
   <footer class="footer">

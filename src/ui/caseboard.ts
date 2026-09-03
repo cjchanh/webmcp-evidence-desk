@@ -8,7 +8,7 @@
 import { el, btn } from './dom.ts'
 import type { BoardState, ClaimEvaluation, Exhibit, Verdict } from '../domain/types.ts'
 
-export type LogTag = 'WEBMCP' | 'SIM' | 'HUMAN' | 'SYS' | 'ERR'
+export type LogTag = 'WEBMCP' | 'SIM' | 'HUMAN' | 'SYS' | 'ERR' | 'USER'
 
 export function formatFreshnessAge(updatedAtMs: number, nowMs = Date.now()): string {
   const elapsedMs = Math.max(0, nowMs - updatedAtMs)
