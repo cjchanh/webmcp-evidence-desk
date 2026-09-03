@@ -11,7 +11,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { appendLog, renderExhibitGrid, setVerdict } from '../src/ui/caseboard.ts'
+import {
+  appendLog,
+  renderExhibitGrid,
+  renderReceiptSummary,
+  selectPrimaryExhibits,
+  setVerdict
+} from '../src/ui/caseboard.ts'
 import {
   applyAgentAction,
   applyHumanAction,
@@ -30,7 +36,7 @@ function mountIndex(): void {
   const body = INDEX_HTML.slice(
     INDEX_HTML.indexOf('<body>') + '<body>'.length,
     INDEX_HTML.indexOf('</body>')
-  )
+  ).replace(/<script[\s\S]*?<\/script>/g, '')
   document.body.innerHTML = body
 }
 
@@ -75,6 +81,21 @@ describe('UI contract — index.html ↔ main.ts element ids', () => {
 })
 
 describe('caseboard render contract', () => {
+  it('shows EX-001 and EX-002 before proposals, then all proposed evidence', () => {
+    const empty = createBoard()
+    expect(selectPrimaryExhibits(EXHIBITS, empty, new Set()).map((e) => e.id)).toEqual([
+      'EX-001',
+      'EX-002'
+    ])
+
+    let proposed = add(empty, 'EX-003', 'supports')
+    proposed = add(proposed, 'EX-001', 'supports')
+    expect(selectPrimaryExhibits(EXHIBITS, proposed, new Set()).map((e) => e.id)).toEqual([
+      'EX-001',
+      'EX-003'
+    ])
+  })
+
   it('controls disabled before proposal, enabled after', () => {
     const grid = document.createElement('div')
     const empty = createBoard()
@@ -110,6 +131,24 @@ describe('caseboard render contract', () => {
     const card = grid.querySelector('[data-exhibit-id="EX-002"]')
     expect(card?.querySelector('.badge-fail')?.textContent).toBe('SIG FAILED — QUARANTINED')
     expect(card?.querySelectorAll('button')).toHaveLength(0)
+  })
+})
+
+describe('receipt summary', () => {
+  it('renders the decision and accepted/rejected counts ahead of raw JSON', () => {
+    const summary = document.createElement('div')
+    renderReceiptSummary(summary, {
+      verdict: 'CONTRADICTED',
+      proposedCount: 3,
+      acceptedCount: 2,
+      rejectedCount: 1
+    })
+    expect(summary.textContent).toContain('Final verdict: CONTRADICTED')
+    expect(summary.textContent).toContain('Agent proposed 3 exhibits')
+    expect(summary.textContent).toContain('Human accepted 2')
+    expect(summary.textContent).toContain('Rejected 1')
+    expect(summary.textContent).toContain('Evidence integrity: VERIFIED')
+    expect(summary.textContent).toContain('Signed locally')
   })
 })
 

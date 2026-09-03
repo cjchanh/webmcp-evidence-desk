@@ -6,7 +6,7 @@
  */
 
 import { el, btn } from './dom.ts'
-import type { BoardState, ClaimEvaluation, Exhibit } from '../domain/types.ts'
+import type { BoardState, ClaimEvaluation, Exhibit, Verdict } from '../domain/types.ts'
 
 export type LogTag = 'WEBMCP' | 'SIM' | 'HUMAN' | 'SYS' | 'ERR'
 
@@ -112,6 +112,26 @@ export interface RenderOptions {
 }
 
 export const MAX_RENDERED_CARDS = 100
+
+/**
+ * Judge-first projection: before an agent proposes anything, show only the
+ * deliberate contradiction pair. Afterwards show every proposed or
+ * quarantined exhibit, in canonical packet order. The full verified packet is
+ * rendered separately behind disclosure.
+ */
+export function selectPrimaryExhibits(
+  exhibits: Exhibit[],
+  board: BoardState,
+  quarantinedIds: ReadonlySet<string>
+): Exhibit[] {
+  const visible = new Set(
+    board.entries.length > 0
+      ? board.entries.map((entry) => entry.exhibit_id)
+      : ['EX-001', 'EX-002']
+  )
+  for (const id of quarantinedIds) visible.add(id)
+  return exhibits.filter((exhibit) => visible.has(exhibit.id))
+}
 
 export function renderExhibitGrid(
   gridEl: HTMLElement,
@@ -224,6 +244,31 @@ export function renderReceiptPreview(previewEl: HTMLElement, jsonText: string): 
     lineSpan.style.animationDelay = `${Math.min(i, MAX_STAGGER_LINES - 1) * 40}ms`
     previewEl.appendChild(lineSpan)
   })
+}
+
+export function renderReceiptSummary(
+  summaryEl: HTMLElement,
+  summary: {
+    verdict: Verdict
+    proposedCount: number
+    acceptedCount: number
+    rejectedCount: number
+  }
+): void {
+  summaryEl.textContent = ''
+  const heading = el('p', 'receipt-summary-verdict', `Final verdict: ${summary.verdict}`)
+  const counts = el(
+    'p',
+    'receipt-summary-counts',
+    `Agent proposed ${summary.proposedCount} exhibit${summary.proposedCount === 1 ? '' : 's'} · ` +
+      `Human accepted ${summary.acceptedCount} · Rejected ${summary.rejectedCount}`
+  )
+  const integrity = el(
+    'p',
+    'receipt-summary-integrity',
+    'Evidence integrity: VERIFIED · Signed locally · accepted hashes anchored in the signed manifest'
+  )
+  summaryEl.append(heading, counts, integrity)
 }
 
 /** Arrow-key cycling across exhibit cards (roving focus). */

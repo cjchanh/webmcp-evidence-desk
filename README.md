@@ -1,10 +1,13 @@
-# Evidence Desk — AI receipts for claims that matter
+# Evidence Desk — agent investigation, human judgment, durable proof
 
-A WebMCP challenge entry: a visible evidence caseboard over a **synthetic** vendor
-handoff packet. An agent discovers the page's four WebMCP tools, searches exhibits,
-inspects exact source spans, evaluates one contested claim, and adds exhibits to a
-shared caseboard. The human pins, removes, or rejects evidence and seals a local
-session receipt referencing the accepted evidence hashes.
+A judge-first [WebMCP Challenge](https://openai.com/webmcp-challenge/) entry: a
+visible evidence caseboard over a **synthetic** vendor handoff packet. An agent
+discovers four page tools, searches the packet, inspects exact source spans,
+evaluates a contested claim, and proposes evidence. Every real tool call appears
+in the page as it runs. The human keeps the final authority: pin or reject the
+proposal, accept the verdict, and seal a local receipt.
+
+> **Agent proposes. Human decides. Evidence preserves what happened.**
 
 **Hero claim:** “Did the vendor provide the required inspection report before acceptance?”
 
@@ -40,16 +43,16 @@ src/domain/                  pure functions: searchExhibits, inspectExhibit,
                              verifyManifest, sealed receipts. No DOM access.
 src/webmcp/                  registration layer; progressive enhancement only;
                              4 tools on document.modelContext when present
-src/ui/                      caseboard, claim card, live tool-call log,
-                             receipt modal; textContent-only rendering
+src/ui/                      judge-first caseboard, live tool-call lifecycle,
+                             human decision boundary, readable receipt summary
 src/simulated/               SIMULATED AGENT ribbon + [SIM] tags driving the
                              identical domain functions
 corpus/exhibits/             13 synthetic exhibits (source of truth)
 public/evidence/             signed manifest (build output)
 src/generated/manifest.ts    same signed manifest as an importable module so the
                              runtime makes ZERO network calls
-tests/                       vitest: unit, contract, tamper, invalid-input,
-                             duplicate-registration, abort, unsupported-browser
+tests/                       vitest: unit, live-page WebMCP execution, UI contract,
+                             tamper, invalid-input, abort, unsupported-browser
 ```
 
 ### Tool contract (frozen)
@@ -65,6 +68,10 @@ Agents may only ADD. Pin / remove / reject / seal are human-exclusive controls,
 enforced in the domain layer, not just the UI. All outputs are JSON strings bounded
 to ≤1500 chars. Tools returning corpus-derived text set
 `annotations.untrustedContentHint`.
+
+Each real execution emits a bounded, input-safe lifecycle event (`started`, then
+`completed`, `refused`, `failed`, or `aborted`). `evaluate_claim` also applies its
+result to the visible verdict. UI callback failures are isolated from tool results.
 
 ## Trust boundary — honest claims
 
@@ -84,6 +91,8 @@ to ≤1500 chars. Tools returning corpus-derived text set
   `untrustedContentHint` is set where the API supports it.
 - **The simulated agent is labeled.** `SIMULATED AGENT` ribbon + `[SIM]` log tags;
   it is never presented as proof WebMCP executed.
+- **The final decision stays human.** A tool-produced verdict cannot be sealed until
+  the person explicitly accepts it. Any later board change invalidates that acceptance.
 
 ## Deployment notes
 
@@ -119,21 +128,26 @@ error isolation and bounded JSON-string outputs.
 > `title`, `annotations` (including `untrustedContentHint`), abort-signal
 > threading, and bounded JSON-string outputs — see `src/webmcp/register.ts`.
 
-## For the judge
+## 20-second judge path
 
-1. **Copy judge prompt** — pastes a self-contained review prompt; use it with an
-   agent that can see this page (ChatGPT desktop in-app browser, or Chrome 149+
-   with WebMCP enabled). Expect tool calls to appear in the live log.
-2. **Run simulated review** — same domain flow, clearly labeled SIMULATED; for
-   browsers/contexts without WebMCP.
-3. **Caseboard** — the agent may ADD exhibits only. Pin / Remove / Reject are
-   human-exclusive adjudication controls.
-4. **SEAL RECEIPT** — signs a local session receipt (ephemeral Ed25519 key)
-   over the accepted evidence hashes and tool log. Refuses to seal before a
-   verdict exists.
-5. **Verify this receipt** — re-checks internal signature and anchors every
-   accepted hash against the shipped signed manifest.
-6. Tamper anything and verification fails: text flips quarantine one exhibit;
-   structural flips break the manifest signature and quarantine everything.
+1. Open the app in ChatGPT's in-app browser and confirm `WEBMCP: ACTIVE (4 TOOLS)`.
+2. Select **COPY AGENT BRIEFING** and give the copied prompt to the agent.
+3. Watch all four real tool calls enter the first-viewport provenance rail.
+4. See the Mar 14 acceptance versus Mar 19 inspection conflict resolve to
+   `VERDICT: CONTRADICTED`; EX-001 and EX-002 land on the decision board.
+5. Pin or reject the evidence, then select **ACCEPT AGENT VERDICT**.
+6. Select **SEAL RECEIPT**. Read the human decision summary first; expand the raw
+   signed JSON only if desired.
+
+**Fallback demo:** **WATCH 20-SECOND GUIDED REPLAY** runs the same domain logic with
+an unmistakable `SIMULATED AGENT` ribbon and `[SIM]` provenance tags. It is not
+claimed as WebMCP proof.
+
+**Adversarial proof:** after the primary flow, open the Forgery Bench, change one
+signed span, and submit it. The altered bytes are quarantined and the seal fails closed.
+
+The official challenge says submissions are judged on WebMCP leverage, execution,
+potential impact, and creativity/ambition. Submission materials and the short demo
+script are staged in [docs/SUBMISSION_PACKAGE.md](docs/SUBMISSION_PACKAGE.md).
 
 No network calls. Synthetic data only.

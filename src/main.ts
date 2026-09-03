@@ -17,7 +17,6 @@ import {
 } from './domain/board.ts'
 import { buildSealedReceipt, collectAcceptedEvidence, verifySealedReceiptEnvelope } from './domain/receipt.ts'
 import { buildForgedExhibitCandidate, probeForgedExhibit } from './domain/forge.ts'
-import { evaluateClaim } from './domain/evaluate.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
 import type {
   BoardState,
@@ -36,6 +35,8 @@ import {
   cycleExhibits,
   renderExhibitGrid,
   renderReceiptPreview,
+  renderReceiptSummary,
+  selectPrimaryExhibits,
   setVerdict,
   type LogTag
 } from './ui/caseboard.ts'
@@ -67,6 +68,8 @@ interface AppState {
   forged: Exhibit[]
   quarantinedIds: Set<string>
   verdict: Verdict | 'PENDING'
+  verdictAccepted: boolean
+  proposalCount: number
   toolLog: string[]
   lastReceipt: SealedReceiptEnvelope | null
 }
@@ -77,6 +80,8 @@ const state: AppState = {
   forged: [],
   quarantinedIds: new Set<string>(),
   verdict: 'PENDING',
+  verdictAccepted: false,
+  proposalCount: 0,
   toolLog: [],
   lastReceipt: null
 }
@@ -96,16 +101,22 @@ const els = {
   bannerSim: byId<HTMLButtonElement>('btn-run-sim-banner'),
   copyBtn: byId<HTMLButtonElement>('btn-copy-judge-prompt'),
   copyFeedback: byId<HTMLSpanElement>('copy-feedback'),
+  reviewStatus: byId<HTMLElement>('review-status'),
+  reviewStatusDetail: byId<HTMLElement>('review-status-detail'),
   verdictStamp: byId<HTMLDivElement>('verdict-stamp'),
   log: byId<HTMLOListElement>('tool-log'),
   grid: byId<HTMLDivElement>('exhibit-grid'),
+  packetGrid: byId<HTMLDivElement>('packet-grid'),
   timeline: byId<HTMLDivElement>('timeline-spine'),
+  acceptVerdictBtn: byId<HTMLButtonElement>('btn-accept-verdict'),
+  verdictAcceptStatus: byId<HTMLSpanElement>('verdict-accept-status'),
   sealBtn: byId<HTMLButtonElement>('btn-seal-receipt'),
   sealStatus: byId<HTMLSpanElement>('seal-status'),
   verifyReceiptBtn: byId<HTMLButtonElement>('btn-verify-receipt'),
   receiptVerifyStatus: byId<HTMLSpanElement>('receipt-verify-status'),
   simInline: byId<HTMLButtonElement>('btn-run-sim-inline'),
   modalBackdrop: byId<HTMLDivElement>('seal-modal-backdrop'),
+  receiptSummary: byId<HTMLDivElement>('receipt-summary'),
   receiptPreview: byId<HTMLPreElement>('seal-receipt-preview'),
   downloadBtn: byId<HTMLButtonElement>('btn-download-receipt'),
   closeModalBtn: byId<HTMLButtonElement>('btn-close-modal'),
@@ -152,6 +163,11 @@ function showSealStatus(text: string): void {
 // so an uncapped log means an unbounded receipt on long judge sessions.
 const MAX_LOG_ENTRIES = 400
 
+function setReviewStatus(status: string, detail: string): void {
+  els.reviewStatus.textContent = status
+  els.reviewStatusDetail.textContent = detail
+}
+
 // --- board ------------------------------------------------------------------
 
 // P0 exhibit arrival: exhibit ids whose agent-add has not yet played its
@@ -173,6 +189,8 @@ function addToBoardFromAgent(exhibitId: string, stance: 'supports' | 'contradict
   const result = applyAgentAction(state.board, { action: 'add', exhibit_id: exhibitId, stance })
   if (result.ok) {
     state.board = result.board
+    state.proposalCount += 1
+    invalidateVerdictAcceptance('Agent proposal changed — review the final verdict again.')
     pendingArrival.add(exhibitId)
     renderGrid()
   } else if (result.reason !== 'duplicate_entry') {
@@ -185,6 +203,7 @@ function humanAction(kind: 'pin' | 'remove' | 'reject', exhibitId: string): void
   const result = applyHumanAction(state.board, { action: kind, exhibit_id: exhibitId })
   if (result.ok) {
     state.board = result.board
+    invalidateVerdictAcceptance('Evidence changed — review the final verdict again.')
     log('HUMAN', `${kind} ${exhibitId}`)
     renderGrid()
   } else {
@@ -196,11 +215,28 @@ function renderGrid(): void {
   // Forged exhibits caught this session render AFTER the verified set: their
   // ids sit in quarantinedIds, so caseboard gives them the SIG FAILED badge,
   // no controls, and the quarantine treatment — the tamper machinery itself.
-  renderExhibitGrid(els.grid, [...state.verified, ...state.forged], state.board, state.quarantinedIds, {
-    onPin: (id) => humanAction('pin', id),
-    onRemove: (id) => humanAction('remove', id),
-    onReject: (id) => humanAction('reject', id)
-  }, { arriveIds: pendingArrival })
+  const allExhibits = [...state.verified, ...state.forged]
+  const callbacks = {
+    onPin: (id: string) => humanAction('pin', id),
+    onRemove: (id: string) => humanAction('remove', id),
+    onReject: (id: string) => humanAction('reject', id)
+  }
+  renderExhibitGrid(
+    els.grid,
+    selectPrimaryExhibits(allExhibits, state.board, state.quarantinedIds),
+    state.board,
+    state.quarantinedIds,
+    callbacks,
+    { arriveIds: pendingArrival }
+  )
+  renderExhibitGrid(
+    els.packetGrid,
+    allExhibits,
+    state.board,
+    state.quarantinedIds,
+    callbacks,
+    { arriveIds: pendingArrival }
+  )
   // One mount, one animation: clear so later re-renders (pin/remove/reject)
   // rebuild these cards in their final state with no replay.
   pendingArrival.clear()
@@ -224,8 +260,37 @@ function shakeBoard(): void {
 
 function applyVerdict(evaluation: ClaimEvaluation): void {
   state.verdict = evaluation.verdict
+  state.verdictAccepted = false
   setVerdict(els.verdictStamp, evaluation)
+  els.acceptVerdictBtn.disabled = false
+  els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
+  els.verdictAcceptStatus.textContent = `Agent proposes ${evaluation.verdict}. Human acceptance required.`
+  setReviewStatus(
+    'AGENT ANALYSIS COMPLETE — YOUR DECISION IS REQUIRED',
+    `${evaluation.reasons.length} source-tied reason${evaluation.reasons.length === 1 ? '' : 's'} returned. Review the board below.`
+  )
   shakeBoard()
+}
+
+function invalidateVerdictAcceptance(message: string): void {
+  if (!state.verdictAccepted) return
+  state.verdictAccepted = false
+  els.acceptVerdictBtn.disabled = state.verdict === 'PENDING'
+  els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
+  els.verdictAcceptStatus.textContent = message
+}
+
+function acceptVerdict(): void {
+  if (state.verdict === 'PENDING') {
+    els.verdictAcceptStatus.textContent = 'No agent verdict exists yet.'
+    return
+  }
+  state.verdictAccepted = true
+  els.acceptVerdictBtn.disabled = true
+  els.acceptVerdictBtn.textContent = 'VERDICT ACCEPTED BY HUMAN'
+  els.verdictAcceptStatus.textContent = `${state.verdict} accepted by human. Receipt can now be sealed.`
+  setReviewStatus('HUMAN DECISION RECORDED', `${state.verdict} accepted — ready to seal locally.`)
+  log('HUMAN', `accepted final verdict: ${state.verdict}`)
 }
 
 // --- simulated lane ---------------------------------------------------------
@@ -243,6 +308,7 @@ async function runSimulated(): Promise<void> {
   }
   simRunning = true
   els.simRibbon.hidden = false
+  setReviewStatus('GUIDED REPLAY RUNNING', 'Simulated lane is labeled and does not count as WebMCP proof.')
   try {
     await runSimulatedAgent(
       {
@@ -324,6 +390,11 @@ async function sealReceipt(): Promise<void> {
     log('ERR', 'seal refused: no evaluation yet (verdict PENDING)')
     return
   }
+  if (!state.verdictAccepted) {
+    showSealStatus('SEAL REFUSED — a human must accept the final verdict first.')
+    log('ERR', 'seal refused: final verdict has not been accepted by a human')
+    return
+  }
 
   const { accepted, refused } = collectAcceptedEvidence(
     state.board.entries,
@@ -339,20 +410,12 @@ async function sealReceipt(): Promise<void> {
 
   sealInFlight = true
   try {
-    const acceptedExhibits = accepted
-      .map((a) => state.verified.find((v) => v.id === a.exhibit_id))
-      .filter((v): v is Exhibit => Boolean(v))
-    const sealedVerdict =
-      acceptedExhibits.length > 0
-        ? evaluateClaim(HERO_CLAIM, acceptedExhibits).verdict
-        : state.verdict
-
     const envelope = await buildSealedReceipt(
       {
         sealedAt: new Date().toISOString(),
         sessionId: sessionId(),
         claimText: HERO_CLAIM,
-        verdict: sealedVerdict,
+        verdict: state.verdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
         manifestPublicKey: MANIFEST.publicKey,
@@ -362,6 +425,12 @@ async function sealReceipt(): Promise<void> {
     )
 
     state.lastReceipt = envelope
+    renderReceiptSummary(els.receiptSummary, {
+      verdict: envelope.receipt.verdict as Verdict,
+      proposedCount: state.proposalCount,
+      acceptedCount: accepted.length,
+      rejectedCount: state.board.entries.filter((entry) => entry.status === 'rejected').length
+    })
     renderReceiptPreview(els.receiptPreview, JSON.stringify(envelope, null, 2))
     els.modalBackdrop.hidden = false
     lastFocusedBeforeModal = document.activeElement as HTMLElement | null
@@ -561,9 +630,15 @@ async function resetCase(): Promise<void> {
     state.forged = []
     state.board = createBoard()
     state.verdict = 'PENDING'
+    state.verdictAccepted = false
+    state.proposalCount = 0
     pendingArrival.clear()
     els.verdictStamp.textContent = 'VERDICT: PENDING REVIEW'
     els.verdictStamp.className = 'verdict-stamp verdict-pending'
+    els.acceptVerdictBtn.disabled = true
+    els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
+    els.verdictAcceptStatus.textContent = 'Awaiting an agent evaluation.'
+    setReviewStatus('AWAITING AGENT', 'Copy the briefing to start a real WebMCP review.')
     renderGrid()
     renderTimeline(els.timeline, state.verified)
     closeForgeBench()
@@ -583,7 +658,7 @@ async function resetCase(): Promise<void> {
  * verifyManifest passes; later re-renders never re-add the class. Under the
  * global reduced-motion kill block no animation runs and the class is inert. */
 function runHashSweep(): void {
-  const idLines = els.grid.querySelectorAll<HTMLElement>('.exhibit-id')
+  const idLines = document.querySelectorAll<HTMLElement>('#exhibit-grid .exhibit-id, #packet-grid .exhibit-id')
   idLines.forEach((line, i) => {
     line.classList.add('hash-sweep')
     line.style.animationDelay = `${i * 60}ms`
@@ -651,7 +726,25 @@ async function bootInner(): Promise<void> {
   const docLike = document as unknown as { modelContext?: ModelContextLike }
   const ctx: ToolContext = {
     exhibits: () => state.verified,
-    addToBoard: (id, stance) => addToBoardFromAgent(id, stance)
+    addToBoard: (id, stance) => addToBoardFromAgent(id, stance),
+    onVerdict: applyVerdict,
+    onLifecycle: (event) => {
+      log('WEBMCP', event.summary)
+      if (event.phase === 'started') {
+        setReviewStatus('AGENT INVESTIGATING', `${event.toolName} is running…`)
+      } else if (event.phase === 'completed' && event.toolName !== 'evaluate_claim') {
+        if (state.verdict !== 'PENDING' && event.toolName === 'update_caseboard') {
+          setReviewStatus(
+            'AGENT ANALYSIS COMPLETE — YOUR DECISION IS REQUIRED',
+            'Evidence proposed on the caseboard. Review it, then accept the final verdict.'
+          )
+        } else {
+          els.reviewStatusDetail.textContent = event.summary
+        }
+      } else if (event.phase === 'refused' || event.phase === 'failed' || event.phase === 'aborted') {
+        setReviewStatus(`AGENT CALL ${event.phase.toUpperCase()}`, event.summary)
+      }
+    }
   }
   const registration = await registerEvidenceTools(docLike, ctx, {
     signal: bootController.signal
@@ -685,6 +778,7 @@ async function bootInner(): Promise<void> {
 // --- wiring -----------------------------------------------------------------
 
 els.copyBtn.addEventListener('click', () => void copyJudgePrompt())
+els.acceptVerdictBtn.addEventListener('click', acceptVerdict)
 els.sealBtn.addEventListener('click', () => void sealReceipt())
 els.downloadBtn.addEventListener('click', downloadReceipt)
 els.verifyReceiptBtn.addEventListener('click', () => void verifyLastReceipt())

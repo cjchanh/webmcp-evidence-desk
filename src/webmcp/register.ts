@@ -46,6 +46,24 @@ export interface ToolContext {
   exhibits(): Exhibit[]
   /** Agent lane into the caseboard; domain layer enforces add-only. */
   addToBoard(exhibitId: string, stance: Stance): ActionResult
+  /** Optional UI bridge. Listener failures never change a tool result. */
+  onLifecycle?(event: ToolLifecycleEvent): void
+  /** Applies a real evaluate_claim result to the visible verdict surface. */
+  onVerdict?(evaluation: ClaimEvaluation): void
+}
+
+export type ToolLifecyclePhase =
+  | 'started'
+  | 'completed'
+  | 'refused'
+  | 'failed'
+  | 'aborted'
+
+export interface ToolLifecycleEvent {
+  toolName: string
+  phase: ToolLifecyclePhase
+  /** Bounded, prewritten status text. Never contains raw tool input. */
+  summary: string
 }
 
 export type RegisterErrorKind =
@@ -178,44 +196,106 @@ function reqString(obj: Record<string, unknown>, key: string, maxLen: number): s
 export function buildToolDefs(ctx: ToolContext): WebMcpToolDefinition[] {
   const UNTRUSTED = { untrustedContentHint: true }
 
-  const searchExecute = async (
+  interface ExecutionResult {
+    output: string
+    phase: 'completed' | 'refused'
+    summary: string
+  }
+
+  const notify = (event: ToolLifecycleEvent): void => {
+    try {
+      ctx.onLifecycle?.(event)
+    } catch {
+      // The page is an observer, never part of the tool's correctness path.
+    }
+  }
+
+  const notifyVerdict = (evaluation: ClaimEvaluation): void => {
+    try {
+      ctx.onVerdict?.(evaluation)
+    } catch {
+      // A broken renderer cannot corrupt or suppress a valid tool result.
+    }
+  }
+
+  const observable = (
+    toolName: string,
+    execute: (input: unknown, options?: { signal?: AbortSignal }) => Promise<ExecutionResult>
+  ): WebMcpToolDefinition['execute'] => {
+    return async (input, options) => {
+      notify({ toolName, phase: 'started', summary: `${toolName} started` })
+      try {
+        const result = await execute(input, options)
+        notify({ toolName, phase: result.phase, summary: result.summary })
+        return result.output
+      } catch (err) {
+        const aborted = isAbortError(err)
+        const refused = err instanceof TypeError
+        notify({
+          toolName,
+          phase: aborted ? 'aborted' : refused ? 'refused' : 'failed',
+          summary: aborted
+            ? `${toolName} aborted`
+            : refused
+              ? `${toolName} refused — invalid or human-exclusive request`
+              : `${toolName} failed`
+        })
+        throw err
+      }
+    }
+  }
+
+  const searchExecute = observable('search_evidence', async (
     input: unknown,
     options?: { signal?: AbortSignal }
-  ): Promise<string> => {
+  ): Promise<ExecutionResult> => {
     throwIfAborted(options?.signal)
     const query = reqString(asRecord(input), 'query', 512)
     const results: SearchResult[] = searchExhibits(query, ctx.exhibits(), {
       signal: options?.signal
     })
-    return toBoundedJson({ results })
-  }
+    return {
+      output: toBoundedJson({ results }),
+      phase: 'completed',
+      summary: `search_evidence completed with ${results.length} result${results.length === 1 ? '' : 's'}`
+    }
+  })
 
-  const inspectExecute = async (
+  const inspectExecute = observable('inspect_exhibit', async (
     input: unknown,
     options?: { signal?: AbortSignal }
-  ): Promise<string> => {
+  ): Promise<ExecutionResult> => {
     throwIfAborted(options?.signal)
     const exhibitId = reqString(asRecord(input), 'exhibit_id', 64)
     const detail = inspectExhibit(exhibitId, ctx.exhibits(), { signal: options?.signal })
-    return toBoundedJson(detail)
-  }
+    return {
+      output: toBoundedJson(detail),
+      phase: 'completed',
+      summary: `inspect_exhibit completed for ${detail.exhibit_id} with ${detail.spans.length} source spans`
+    }
+  })
 
-  const evaluateExecute = async (
+  const evaluateExecute = observable('evaluate_claim', async (
     input: unknown,
     options?: { signal?: AbortSignal }
-  ): Promise<string> => {
+  ): Promise<ExecutionResult> => {
     throwIfAborted(options?.signal)
     const claimText = reqString(asRecord(input), 'claim', 1000)
     const evaluation: ClaimEvaluation = evaluateClaim(claimText, ctx.exhibits(), {
       signal: options?.signal
     })
-    return toBoundedJson(evaluation)
-  }
+    notifyVerdict(evaluation)
+    return {
+      output: toBoundedJson(evaluation),
+      phase: 'completed',
+      summary: `evaluate_claim completed: ${evaluation.verdict} with ${evaluation.reasons.length} span-tied reason${evaluation.reasons.length === 1 ? '' : 's'}`
+    }
+  })
 
-  const boardExecute = async (
+  const boardExecute = observable('update_caseboard', async (
     input: unknown,
     options?: { signal?: AbortSignal }
-  ): Promise<string> => {
+  ): Promise<ExecutionResult> => {
     throwIfAborted(options?.signal)
     const obj = asRecord(input)
     if (obj.action !== 'add') {
@@ -232,12 +312,18 @@ export function buildToolDefs(ctx: ToolContext): WebMcpToolDefinition[] {
       throw new TypeError("invalid params: stance must be 'supports' or 'contradicts'")
     }
     const result = ctx.addToBoard(exhibitId, stance)
-    return toBoundedJson({
-      added: result.ok,
-      reason: result.ok ? undefined : result.reason,
-      board: boardSummary(result.board)
-    })
-  }
+    return {
+      output: toBoundedJson({
+        added: result.ok,
+        reason: result.ok ? undefined : result.reason,
+        board: boardSummary(result.board)
+      }),
+      phase: result.ok ? 'completed' : 'refused',
+      summary: result.ok
+        ? `update_caseboard completed: added ${exhibitId} as ${stance}`
+        : `update_caseboard refused ${exhibitId}: ${result.reason}`
+    }
+  })
 
   return [
     {

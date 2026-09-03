@@ -102,7 +102,7 @@ describe('caught sequence through the real page', () => {
     document.body.innerHTML = html.slice(
       html.indexOf('<body>') + '<body>'.length,
       html.indexOf('</body>')
-    )
+    ).replace(/<script[\s\S]*?<\/script>/g, '')
     await import('../src/main.ts')
 
     // Boot completes when the stamp settles at PENDING over verified evidence.
@@ -112,7 +112,9 @@ describe('caught sequence through the real page', () => {
       )
     })
     const grid = document.getElementById('exhibit-grid')!
-    expect(grid.querySelectorAll('.exhibit-card')).toHaveLength(13)
+    const packetGrid = document.getElementById('packet-grid')!
+    expect(grid.querySelectorAll('.exhibit-card')).toHaveLength(2)
+    expect(packetGrid.querySelectorAll('.exhibit-card')).toHaveLength(13)
 
     // Open the bench; editors preload EX-002's exact signed spans.
     ;(document.getElementById('btn-open-forge-bench') as HTMLButtonElement).click()
@@ -169,7 +171,8 @@ describe('caught sequence through the real page', () => {
         'VERDICT: PENDING REVIEW'
       )
     })
-    expect(grid.querySelectorAll('.exhibit-card')).toHaveLength(13)
+    expect(grid.querySelectorAll('.exhibit-card')).toHaveLength(2)
+    expect(packetGrid.querySelectorAll('.exhibit-card')).toHaveLength(13)
     expect(grid.querySelectorAll('.badge-fail')).toHaveLength(0)
     expect(grid.querySelectorAll('[data-quarantined]')).toHaveLength(0)
     const ex002 = grid.querySelector('[data-exhibit-id="EX-002"]')!

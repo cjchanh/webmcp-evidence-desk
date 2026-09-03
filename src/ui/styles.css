@@ -812,3 +812,308 @@ button.big {
   justify-content: center;
   flex-shrink: 0;
 }
+
+/* --- Judge-first finalist layout ------------------------------------------ */
+
+#app {
+  gap: 1.5rem;
+}
+
+.judge-stage {
+  min-height: min(47rem, calc(100vh - 7rem));
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(25rem, 0.95fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: center;
+  border-top: 0.25rem solid var(--graphite);
+  padding-top: clamp(1.25rem, 3vh, 2.5rem);
+}
+
+.judge-brief {
+  min-width: 0;
+}
+
+.judge-stage .case-question {
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  max-width: 12ch;
+  margin-bottom: 1.25rem;
+}
+
+.judge-stage .lede {
+  max-width: 38rem;
+  margin-bottom: 1.1rem;
+}
+
+.claim-document {
+  background: var(--white);
+  border: 0.08rem solid var(--line);
+  border-left: 0.3rem solid var(--signal);
+  padding: 1rem 1.15rem;
+  max-width: 42rem;
+}
+
+.document-label,
+.date-label {
+  display: block;
+  margin: 0 0 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--slate);
+}
+
+.claim-document .claim-text {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+}
+
+.trust-contract {
+  margin: 1rem 0;
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.live-review-panel {
+  min-width: 0;
+  border-top: 0.25rem solid var(--signal);
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.panel-heading,
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.panel-heading h2,
+.section-heading h2,
+.seal-card h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.45rem, 2.2vw, 2rem);
+}
+
+.live-mark,
+.boundary-label {
+  border: 0.08rem solid currentColor;
+  padding: 0.15rem 0.45rem;
+  color: var(--signal);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.review-status-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem 0;
+}
+
+.review-status-shell strong,
+.review-status-shell span:not(.status-pulse) {
+  display: block;
+}
+
+.review-status-shell strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.035em;
+}
+
+.review-status-shell span:not(.status-pulse) {
+  color: var(--slate);
+  font-size: 0.78rem;
+}
+
+.status-pulse {
+  width: 0.68rem;
+  height: 0.68rem;
+  border: 0.12rem solid var(--signal);
+  border-radius: 50%;
+  margin-top: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.live-review-panel .tool-log {
+  min-height: 11rem;
+  max-height: 14rem;
+}
+
+.date-conflict {
+  margin: 1rem 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 0.08rem solid var(--line);
+}
+
+.date-conflict strong,
+.date-conflict small {
+  display: block;
+}
+
+.date-conflict strong {
+  font-family: var(--font-serif);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.date-conflict small {
+  margin-top: 0.35rem;
+  color: var(--slate);
+  font-size: 0.72rem;
+}
+
+.conflict-mark {
+  color: var(--oxide);
+  font: 800 1.5rem var(--font-serif);
+}
+
+.section-copy {
+  max-width: 52rem;
+  margin: 0.4rem 0 1.25rem;
+  color: var(--slate);
+}
+
+.primary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.packet-disclosure,
+.raw-receipt-disclosure {
+  margin-top: 1.25rem;
+  border-top: 0.08rem solid var(--line);
+  padding-top: 0.9rem;
+}
+
+.packet-disclosure summary,
+.raw-receipt-disclosure summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.035em;
+}
+
+.packet-grid {
+  margin-top: 1rem;
+}
+
+.human-decision-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  margin-top: 1.4rem;
+  padding: 1.1rem 1.2rem;
+  background: var(--paper);
+  border: 0.08rem solid var(--graphite);
+}
+
+.human-authority {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.decision-button {
+  min-width: 15rem;
+  border-color: var(--graphite);
+}
+
+.seal-card {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.seal-card > div:first-child {
+  max-width: 48rem;
+}
+
+.seal-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.receipt-summary {
+  background: var(--paper);
+  border: 0.08rem solid var(--line);
+  border-left: 0.3rem solid var(--signal);
+  padding: 1rem 1.1rem;
+}
+
+.receipt-summary p {
+  margin: 0.2rem 0;
+}
+
+.receipt-summary-verdict {
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.receipt-summary-counts,
+.receipt-summary-integrity {
+  color: var(--slate);
+}
+
+@media (max-width: 880px) {
+  .judge-stage {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .judge-stage .case-question {
+    max-width: 14ch;
+  }
+}
+
+@media (max-width: 620px) {
+  #app {
+    padding-inline: 0.85rem;
+  }
+
+  .judge-stage .case-question {
+    font-size: clamp(2.2rem, 12vw, 3.3rem);
+  }
+
+  .primary-grid,
+  .date-conflict {
+    grid-template-columns: 1fr;
+  }
+
+  .conflict-mark {
+    transform: rotate(90deg);
+    justify-self: start;
+  }
+
+  .human-decision-panel,
+  .seal-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decision-button {
+    min-width: 0;
+    width: 100%;
+  }
+}

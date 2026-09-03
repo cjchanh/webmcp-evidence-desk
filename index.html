@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evidence Desk — Verifiable AI receipts</title>
+  <title>Evidence Desk — Judge-first WebMCP evidence review</title>
   <link rel="stylesheet" href="/src/ui/styles.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-name">Evidence Desk</span>
-      <span class="brand-sub">Verifiable AI receipts</span>
+      <span class="brand-sub">Judge-first WebMCP evidence review</span>
     </div>
     <div class="status-cluster">
       <span id="webmcp-status" class="badge badge-neutral">WEBMCP: CHECKING</span>
@@ -31,74 +31,121 @@
 
   <main id="app">
 
-    <!-- The spine: what this is, in four lines -->
-    <section class="case-header">
-      <p class="eyebrow">CASE FILE HX-17 · ADVERSARIAL EVIDENCE DESK</p>
-      <h1 class="case-question">Did Meridian Components deliver the required inspection report before acceptance?</h1>
-      <p class="lede">
-        Thirteen exhibits from the vendor handoff packet sit below.
-        Every span is hash-verified against a signed manifest — nothing here can be
-        quietly edited. Your AI agent searches the exhibits, inspects exact source
-        spans, and argues the claim. You decide what stands, then seal the record.
-        Or skip the tour: open the forgery bench and try to slip a lie past the manifest.
-      </p>
-      <ol class="how-strip" aria-label="How this works">
-        <li><span class="step-num">1</span><strong>INVESTIGATE</strong> — your agent searches and inspects the exhibits</li>
-        <li><span class="step-num">2</span><strong>ADJUDICATE</strong> — evidence lands on the caseboard; you pin or reject</li>
-        <li><span class="step-num">3</span><strong>SEAL</strong> — sign a tamper-evident local receipt of what stood</li>
-      </ol>
-      <p class="challenge-line">Everything below is signed. Everything above board is yours to attack.</p>
-    </section>
-
-    <!-- The contested claim + the two ways to run the review -->
-    <section class="card claim-card" aria-labelledby="claim-heading">
-      <p class="eyebrow">THE CONTESTED CLAIM</p>
-      <blockquote id="claim-text" class="claim-text">
-        “The vendor provided the required inspection report before acceptance.”
-      </blockquote>
-      <div class="claim-actions">
-        <button id="btn-copy-judge-prompt" type="button" class="primary">Copy agent briefing</button>
-        <button id="btn-run-sim-inline" type="button" hidden>Run simulated review</button>
+    <section id="judge-stage" class="judge-stage" aria-labelledby="page-title">
+      <div class="judge-brief">
+        <p class="eyebrow">CASE HX-17 · LIVE WEBMCP REVIEW</p>
+        <h1 id="page-title" class="case-question">Your agent investigates.<br />You keep the verdict.</h1>
+        <p class="lede">
+          Evidence Desk turns a contested claim into a visible, source-tied agent review—then stops at the human decision boundary.
+        </p>
+        <div class="claim-document">
+          <p class="document-label">THE CONTESTED CLAIM</p>
+          <blockquote id="claim-text" class="claim-text">
+            “The vendor provided the required inspection report before acceptance.”
+          </blockquote>
+        </div>
+        <p id="trust-contract" class="trust-contract">Agent proposes. Human decides. Evidence preserves what happened.</p>
+        <div class="claim-actions">
+          <button id="btn-copy-judge-prompt" type="button" class="primary">COPY AGENT BRIEFING</button>
+          <button id="btn-run-sim-inline" type="button" hidden>WATCH 20-SECOND GUIDED REPLAY</button>
+        </div>
         <span id="copy-feedback" class="feedback" role="status"></span>
+        <p class="hint">Paste the briefing into an agent with this page open. Four real tool calls appear at right.</p>
       </div>
-      <p class="hint">Paste the briefing into an agent that can see this page. Its tool calls will appear in the provenance rail.</p>
-      <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
+
+      <div class="card live-review-panel" aria-labelledby="log-heading">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">PROVENANCE — LIVE TOOL-CALL RECORD</p>
+            <h2 id="log-heading">What the agent did</h2>
+          </div>
+          <span class="live-mark">LIVE</span>
+        </div>
+        <div class="review-status-shell" aria-live="polite">
+          <span class="status-pulse" aria-hidden="true"></span>
+          <div>
+            <strong id="review-status">AWAITING AGENT</strong>
+            <span id="review-status-detail">Copy the briefing to start a real WebMCP review.</span>
+          </div>
+        </div>
+        <ol id="tool-log" class="tool-log"></ol>
+        <span id="log-live-status" class="sr-only" role="status"></span>
+
+        <div id="date-conflict" class="date-conflict" aria-label="Decisive date conflict">
+          <div>
+            <span class="date-label">ACCEPTED</span>
+            <strong>MAR 14</strong>
+            <small>EX-003 acceptance certificate</small>
+          </div>
+          <span class="conflict-mark" aria-hidden="true">≠</span>
+          <div>
+            <span class="date-label">INSPECTED</span>
+            <strong>MAR 19</strong>
+            <small>EX-002 signed inspection report</small>
+          </div>
+        </div>
+        <div id="verdict-stamp" class="verdict-stamp verdict-pending" role="status">VERDICT: PENDING REVIEW</div>
+      </div>
     </section>
 
-    <!-- The adversarial challenge: the judge attacks the manifest personally -->
-    <section class="card forge-card" aria-labelledby="forge-heading">
-      <p class="eyebrow">ADVERSARIAL CHALLENGE</p>
-      <h2 id="forge-heading" class="forge-heading">TRY TO FOOL IT</h2>
-      <p class="forge-copy">
-        Edit a real exhibit. Change a date. Slip in a lie. Submit your forgery
-        and watch the manifest catch it.
-      </p>
-      <div class="claim-actions">
-        <button id="btn-open-forge-bench" type="button" class="primary">OPEN THE FORGERY BENCH</button>
-        <button id="btn-reset-case" type="button" hidden>RESET CASE</button>
-      </div>
-    </section>
-
-    <section class="card log-card" aria-labelledby="log-heading">
-      <h2 id="log-heading">Provenance — live tool-call record</h2>
-      <ol id="tool-log" class="tool-log"></ol>
-      <span id="log-live-status" class="sr-only" role="status"></span>
-    </section>
+    <ol class="how-strip" aria-label="Evidence Desk trust flow">
+      <li><span class="step-num">1</span><span><strong>AGENT INVESTIGATES</strong><br />search · inspect · evaluate · propose</span></li>
+      <li><span class="step-num">2</span><span><strong>HUMAN ADJUDICATES</strong><br />pin · reject · accept verdict</span></li>
+      <li><span class="step-num">3</span><span><strong>EVIDENCE PRESERVES</strong><br />hashes · manifest · local receipt</span></li>
+    </ol>
 
     <section class="card board-card" aria-labelledby="board-heading">
-      <h2 id="board-heading">Caseboard</h2>
-      <p class="hint">
-        The agent may ADD exhibits only.
-        Pin, Remove, Reject, and Seal are human-exclusive controls.
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">PROPOSAL → DECISION</p>
+          <h2 id="board-heading">Decisive evidence</h2>
+        </div>
+        <span class="boundary-label">HUMAN CONTROLLED</span>
+      </div>
+      <p class="section-copy">
+        The agent can propose evidence. Only you can pin, remove, or reject it. The initial view stays on the deliberate EX-001 / EX-002 contradiction.
       </p>
       <div id="timeline-spine" class="timeline-spine" role="img" aria-label="Exhibit dates plotted across the case window; hollow rings mark contested dates"></div>
-      <div id="exhibit-grid" class="exhibit-grid" aria-label="Exhibit cards"></div>
+      <div id="exhibit-grid" class="exhibit-grid primary-grid" aria-label="Decisive and proposed exhibit cards"></div>
+
+      <details id="all-exhibits-disclosure" class="packet-disclosure">
+        <summary>OPEN THE FULL SIGNED PACKET · 13 EXHIBITS</summary>
+        <p class="hint">Every span below was checked client-side against the signed manifest before display.</p>
+        <div id="packet-grid" class="exhibit-grid packet-grid" aria-label="All verified exhibit cards"></div>
+      </details>
+
+      <div class="human-decision-panel">
+        <div>
+          <p class="eyebrow">FINAL VERDICT BOUNDARY</p>
+          <p id="human-authority" class="human-authority">Only you can accept the verdict and seal the receipt.</p>
+          <span id="verdict-accept-status" class="feedback" role="status">Awaiting an agent evaluation.</span>
+        </div>
+        <button id="btn-accept-verdict" type="button" class="decision-button" disabled>ACCEPT AGENT VERDICT</button>
+      </div>
     </section>
 
-    <section class="card seal-card">
-      <button id="btn-seal-receipt" type="button" class="primary big">SEAL RECEIPT</button>
-      <span id="seal-status" class="feedback" role="alert"></span>
-      <span class="hint">Seals a local session receipt referencing the accepted evidence hashes. No network. Tamper-evident, not tamper-proof.</span>
+    <section id="seal-section" class="card seal-card" aria-labelledby="seal-heading">
+      <div>
+        <p class="eyebrow">PRESERVE THE DECISION</p>
+        <h2 id="seal-heading">Seal a local, tamper-evident receipt</h2>
+        <p class="hint">Records the human-accepted verdict, accepted evidence hashes, and the tool-call trail. No network. Not an authoritative legal signature.</p>
+      </div>
+      <div class="seal-actions">
+        <button id="btn-seal-receipt" type="button" class="primary big">SEAL RECEIPT</button>
+        <span id="seal-status" class="feedback" role="alert"></span>
+      </div>
+    </section>
+
+    <section id="forgery-section" class="card forge-card" aria-labelledby="forge-heading">
+      <p class="eyebrow">AFTER THE PRIMARY FLOW · ADVERSARIAL PROOF</p>
+      <h2 id="forge-heading" class="forge-heading">Forgery Bench</h2>
+      <p class="forge-copy">
+        Edit a signed exhibit, change one date, and submit the forgery. The manifest comparison catches the changed bytes and quarantines the evidence.
+      </p>
+      <div class="claim-actions">
+        <button id="btn-open-forge-bench" type="button">OPEN THE FORGERY BENCH</button>
+        <button id="btn-reset-case" type="button" hidden>RESET CASE</button>
+      </div>
     </section>
 
   </main>
@@ -113,7 +160,11 @@
   <div id="seal-modal-backdrop" class="modal-backdrop" hidden>
     <div id="seal-modal" class="modal card" role="dialog" aria-modal="true" aria-labelledby="seal-modal-title">
       <h2 id="seal-modal-title">Sealed session receipt</h2>
-      <pre id="seal-receipt-preview" class="receipt-preview"></pre>
+      <div id="receipt-summary" class="receipt-summary"></div>
+      <details class="raw-receipt-disclosure">
+        <summary>VIEW RAW SIGNED JSON</summary>
+        <pre id="seal-receipt-preview" class="receipt-preview"></pre>
+      </details>
       <div class="modal-actions">
         <button id="btn-download-receipt" type="button" class="primary">Download receipt JSON</button>
         <button id="btn-verify-receipt" type="button">Verify this receipt</button>
