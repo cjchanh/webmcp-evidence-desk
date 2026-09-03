@@ -183,19 +183,29 @@ const els = {
 type ProvenanceMode = 'CHECKING' | 'LIVE' | 'DEGRADED' | 'SIMULATED' | 'FAILED'
 let baseProvenanceMode: ProvenanceMode = 'CHECKING'
 let simulatedActivity = false
+let liveToolActivity = false
+
+function renderProvenanceMode(): void {
+  els.provenanceMode.textContent = simulatedActivity
+    ? liveToolActivity
+      ? 'MIXED'
+      : 'SIMULATED'
+    : baseProvenanceMode
+}
 
 function setProvenanceMode(mode: ProvenanceMode): void {
   baseProvenanceMode = mode
-  els.provenanceMode.textContent =
-    simulatedActivity && (mode === 'LIVE' || mode === 'DEGRADED') ? 'MIXED' : mode
+  renderProvenanceMode()
 }
 
 function markSimulatedActivity(): void {
   simulatedActivity = true
-  els.provenanceMode.textContent =
-    baseProvenanceMode === 'LIVE' || baseProvenanceMode === 'DEGRADED'
-      ? 'MIXED'
-      : 'SIMULATED'
+  renderProvenanceMode()
+}
+
+function markLiveToolActivity(): void {
+  liveToolActivity = true
+  renderProvenanceMode()
 }
 
 // --- logging ----------------------------------------------------------------
@@ -1124,6 +1134,7 @@ async function bootInner(): Promise<void> {
     onLifecycle: (event) => {
       log('WEBMCP', event.summary)
       if (event.phase === 'started') {
+        markLiveToolActivity()
         setReviewStatus('LOADING', `${event.toolName} is running…`)
       } else if (event.phase === 'completed' && event.toolName !== 'evaluate_claim') {
         if (state.verdict !== 'PENDING' && event.toolName === 'update_caseboard') {

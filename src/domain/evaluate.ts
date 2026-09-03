@@ -56,9 +56,11 @@ function isValidIsoDate(s: string): boolean {
  * not the acceptance date, and must not anchor the comparison.
  */
 const ACCEPTANCE_ANCHOR_RE =
-  /(?:accept(?:ed)\b[^.\n]{0,80}?|acceptance\s+(?:date|dated|on)\b[^.\n]{0,40}?)\d{4}-\d{2}-\d{2}/i
-const PERFORMED_RE = /(?:performed|conducted|inspected|completed|done)\b[^.\n]{0,80}?\d{4}-\d{2}-\d{2}/i
-const ATTESTATION_RE = /inspection\b[^.\n]{0,120}?\bcompleted\b[^.\n]{0,40}?\d{4}-\d{2}-\d{2}/i
+  /(?:accept(?:ed)\b[^.\n]{0,80}?|acceptance\s+(?:date|dated|on)\b[^.\n]{0,40}?)\d{4}-\d{2}-\d{2}|(?:on|as of)\s+\d{4}-\d{2}-\d{2}\s*,?[^.\n;]{0,80}\baccepted\b/i
+const PERFORMED_RE =
+  /(?:performed|conducted|inspected|completed|done)\b[^.\n]{0,80}?\d{4}-\d{2}-\d{2}|(?:on|as of)\s+\d{4}-\d{2}-\d{2}\s*,?[^.\n;]{0,80}\b(?:performed|conducted|inspected|completed|done)\b/i
+const ATTESTATION_RE =
+  /inspection\b[^.\n]{0,120}?\bcompleted\b[^.\n]{0,40}?\d{4}-\d{2}-\d{2}|(?:on|as of)\s+\d{4}-\d{2}-\d{2}\s*,?[^.\n;]{0,80}\binspection\b[^.\n;]{0,40}\bcompleted\b/i
 
 type Role = 'attestation' | 'inspection_report' | 'acceptance' | 'other'
 

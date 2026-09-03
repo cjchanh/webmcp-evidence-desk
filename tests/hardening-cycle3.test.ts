@@ -181,6 +181,44 @@ describe('verifySealedReceiptEnvelope (cycle-3 affordance)', () => {
     expect(result.problems).toContain(`accepted exhibit ${exhibit.id} has no span hashes`)
   })
 
+  it('returns a failed verification result for a null accepted-evidence entry', async () => {
+    const localSigner = signer()
+    const envelope = await buildSealedReceipt(BASE_INPUT, localSigner)
+    const untrusted = envelope as unknown as {
+      receipt: { accepted_evidence: unknown[] }
+      receipt_signature: string
+    }
+    untrusted.receipt.accepted_evidence = [null]
+    untrusted.receipt_signature = bytesToHex(
+      localSigner.sign(utf8Bytes(JSON.stringify(untrusted.receipt)))
+    )
+
+    const result = await verifySealedReceiptEnvelope(untrusted, { manifestExhibits: [] })
+    expect(result.signatureValid).toBe(true)
+    expect(result.hashesAnchoredInManifest).toBe(false)
+    expect(result.problems).toContain('accepted evidence entry 0 is not an object')
+  })
+
+  it('returns a failed verification result for non-string accepted span hashes', async () => {
+    const localSigner = signer()
+    const envelope = await buildSealedReceipt(BASE_INPUT, localSigner)
+    const untrusted = envelope as unknown as {
+      receipt: {
+        accepted_evidence: Array<{ exhibit_id: string; span_sha256s: unknown[] }>
+      }
+      receipt_signature: string
+    }
+    untrusted.receipt.accepted_evidence[0]!.span_sha256s = [7]
+    untrusted.receipt_signature = bytesToHex(
+      localSigner.sign(utf8Bytes(JSON.stringify(untrusted.receipt)))
+    )
+
+    const result = await verifySealedReceiptEnvelope(untrusted, { manifestExhibits: [] })
+    expect(result.signatureValid).toBe(true)
+    expect(result.hashesAnchoredInManifest).toBe(false)
+    expect(result.problems).toContain('accepted exhibit EX-001 has an invalid span hash at index 0')
+  })
+
   it('rejects a validly signed DECLINED decision paired with an adopted verdict', async () => {
     const localSigner = signer()
     const envelope = await buildSealedReceipt(

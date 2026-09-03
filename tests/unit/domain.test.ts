@@ -185,6 +185,68 @@ describe('evaluateClaim — verdict correctness', () => {
     expect(evaluation.missing).toContain('dated inspection report')
   })
 
+  it('accepts same-sentence dates placed before acceptance and performance verbs', () => {
+    const exhibits = [
+      {
+        id: 'EX-DATE-FIRST-A',
+        title: 'Acceptance Certificate AC-DATE-FIRST',
+        spans: [
+          {
+            span_id: 'EX-DATE-FIRST-A-1',
+            text: 'On 2026-03-14, the customer accepted Lot HX-17 into service.',
+            sha256: 'x'
+          }
+        ]
+      },
+      {
+        id: 'EX-DATE-FIRST-R',
+        title: 'Inspection Report IR-DATE-FIRST',
+        spans: [
+          {
+            span_id: 'EX-DATE-FIRST-R-1',
+            text: 'On 2026-03-10, all electrical continuity checks were performed at the facility.',
+            sha256: 'x'
+          }
+        ]
+      }
+    ]
+
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('SUPPORTED')
+    expect(evaluation.reasons[0]?.span_id).toBe('EX-DATE-FIRST-R-1')
+  })
+
+  it('does not attach an earlier-sentence date to a later undated event verb', () => {
+    const exhibits = [
+      {
+        id: 'EX-DATE-GUARD-A',
+        title: 'Acceptance Certificate AC-DATE-GUARD',
+        spans: [
+          {
+            span_id: 'EX-DATE-GUARD-A-1',
+            text: 'The certificate was recorded on 2026-03-14. The customer accepted Lot HX-17 into service.',
+            sha256: 'x'
+          }
+        ]
+      },
+      {
+        id: 'EX-DATE-GUARD-R',
+        title: 'Inspection Report IR-DATE-GUARD',
+        spans: [
+          {
+            span_id: 'EX-DATE-GUARD-R-1',
+            text: 'The report was issued on 2026-03-10. All checks were performed at the facility.',
+            sha256: 'x'
+          }
+        ]
+      }
+    ]
+
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('INSUFFICIENT')
+    expect(evaluation.missing).toContain('dated acceptance certificate')
+  })
+
   it('F3: a revised report dated after acceptance contradicts even when an earlier report predates it', () => {
     const exhibits = [
       {

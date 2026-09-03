@@ -270,7 +270,7 @@ export async function verifySealedReceiptEnvelope(
   // Cross-check accepted hashes against the signed manifest when the caller
   // supplies the authentic exhibit list.
   const receipt = env.receipt as {
-    accepted_evidence?: Array<{ exhibit_id: string; span_sha256s?: string[] }>
+    accepted_evidence?: unknown
     human_decision?: {
       status?: unknown
       agent_verdict?: unknown
@@ -280,6 +280,8 @@ export async function verifySealedReceiptEnvelope(
     manifest_public_key?: string
     verdict?: unknown
   }
+  const acceptedEvidence: Array<{ exhibitId: string; spanHashes: string[] }> = []
+  let acceptedEvidenceShapeValid = true
   if (!receipt.human_decision || typeof receipt.human_decision !== 'object') {
     problems.push('receipt has no recorded human decision')
   } else {
@@ -313,6 +315,7 @@ export async function verifySealedReceiptEnvelope(
   }
   if (!Array.isArray(receipt.accepted_evidence)) {
     problems.push('receipt accepted_evidence is not an array')
+    acceptedEvidenceShapeValid = false
   } else {
     if (
       receipt.human_decision?.status !== 'DECLINED' &&
@@ -320,12 +323,38 @@ export async function verifySealedReceiptEnvelope(
     ) {
       problems.push('adopted verdict has no accepted evidence')
     }
-    for (const item of receipt.accepted_evidence) {
-      if (!Array.isArray(item.span_sha256s) || item.span_sha256s.length === 0) {
-        problems.push(
-          `accepted exhibit ${String(item.exhibit_id).slice(0, 64)} has no span hashes`
-        )
+    for (const [index, item] of receipt.accepted_evidence.entries()) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        acceptedEvidenceShapeValid = false
+        problems.push(`accepted evidence entry ${index} is not an object`)
+        continue
       }
+      const candidate = item as Record<string, unknown>
+      if (typeof candidate.exhibit_id !== 'string' || candidate.exhibit_id.trim().length === 0) {
+        acceptedEvidenceShapeValid = false
+        problems.push(`accepted evidence entry ${index} has an invalid exhibit_id`)
+        continue
+      }
+      const exhibitId = candidate.exhibit_id
+      if (!Array.isArray(candidate.span_sha256s) || candidate.span_sha256s.length === 0) {
+        acceptedEvidenceShapeValid = false
+        problems.push(
+          `accepted exhibit ${exhibitId.slice(0, 64)} has no span hashes`
+        )
+        continue
+      }
+      const spanHashes: string[] = []
+      for (const [hashIndex, hash] of candidate.span_sha256s.entries()) {
+        if (typeof hash !== 'string' || hash.length === 0) {
+          acceptedEvidenceShapeValid = false
+          problems.push(
+            `accepted exhibit ${exhibitId.slice(0, 64)} has an invalid span hash at index ${hashIndex}`
+          )
+          continue
+        }
+        spanHashes.push(hash)
+      }
+      acceptedEvidence.push({ exhibitId, spanHashes })
     }
   }
   if (
@@ -341,23 +370,19 @@ export async function verifySealedReceiptEnvelope(
     const byId = new Map(opts.manifestExhibits.map((m) => [m.id, m]))
     // Vacuous anchoring: a DECLINED receipt seals zero accepted evidence by
     // design — an empty list is anchored (nothing to check), not a failure.
-    let anchored = true
-    for (const item of receipt.accepted_evidence) {
-      if (!Array.isArray(item.span_sha256s) || item.span_sha256s.length === 0) {
-        anchored = false
-        continue
-      }
-      const manifestExhibit = byId.get(item.exhibit_id)
+    let anchored = acceptedEvidenceShapeValid
+    for (const item of acceptedEvidence) {
+      const manifestExhibit = byId.get(item.exhibitId)
       if (!manifestExhibit) {
         anchored = false
-        problems.push(`accepted exhibit ${String(item.exhibit_id).slice(0, 64)} not present in signed manifest`)
+        problems.push(`accepted exhibit ${item.exhibitId.slice(0, 64)} not present in signed manifest`)
         continue
       }
       const manifestHashes = new Set(manifestExhibit.spans.map((s) => s.sha256))
-      for (const h of item.span_sha256s ?? []) {
+      for (const h of item.spanHashes) {
         if (!manifestHashes.has(h)) {
           anchored = false
-          problems.push(`accepted hash ${h.slice(0, 12)}… not in manifest spans for ${String(item.exhibit_id).slice(0, 64)}`)
+          problems.push(`accepted hash ${h.slice(0, 12)}… not in manifest spans for ${item.exhibitId.slice(0, 64)}`)
         }
       }
     }

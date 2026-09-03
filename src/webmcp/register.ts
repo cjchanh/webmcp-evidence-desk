@@ -120,7 +120,7 @@ export function toBoundedJson(value: unknown, maxChars = MAX_TOOL_OUTPUT_CHARS):
     let current = structuredCloneSafe(value)
     for (let i = 0; i < 12; i++) {
       current = halveArrays(current)
-      const s = attempt(current)
+      const s = attempt(markArrayTruncation(current))
       if (s) return s
     }
 
@@ -138,6 +138,17 @@ export function toBoundedJson(value: unknown, maxChars = MAX_TOOL_OUTPUT_CHARS):
   } catch {
     return notSerializable()
   }
+}
+
+function markArrayTruncation(value: unknown): Record<string, unknown> {
+  const disclosure = {
+    truncated: true,
+    truncation_note: 'one or more arrays were shortened to fit the tool output limit'
+  }
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>), ...disclosure }
+  }
+  return { output: value, ...disclosure }
 }
 
 function structuredCloneSafe(value: unknown): unknown {

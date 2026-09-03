@@ -143,6 +143,50 @@ describe('output contract — plain bounded JSON strings', () => {
     expect(() => JSON.parse(out)).not.toThrow()
   })
 
+  it('discloses when a many-report evaluation is shortened to fit the tool limit', async () => {
+    const manyReports = [
+      {
+        id: 'EX-ACCEPT',
+        title: 'Acceptance Certificate AC-MANY',
+        spans: [
+          {
+            span_id: 'EX-ACCEPT-1',
+            text: 'The customer accepted Lot HX-17 on 2026-03-14.',
+            sha256: 'a'.repeat(64)
+          }
+        ]
+      },
+      ...Array.from({ length: 19 }, (_, index) => ({
+        id: `EX-REPORT-${index + 1}`,
+        title: `Inspection Report IR-MANY-${index + 1}`,
+        spans: [
+          {
+            span_id: `EX-REPORT-${index + 1}-1`,
+            text: `All electrical continuity checks were performed on 2026-03-${String(15 + (index % 10)).padStart(2, '0')} at the Meridian facility.`,
+            sha256: String(index).padStart(64, '0')
+          }
+        ]
+      }))
+    ]
+    const evaluate = buildToolDefs(makeToolContext(manyReports).ctx).find(
+      (tool) => tool.name === 'evaluate_claim'
+    )!
+
+    const output = await evaluate.execute({ claim: HERO_CLAIM })
+    const parsed = JSON.parse(output) as {
+      verdict: string
+      reasons: unknown[]
+      truncated?: boolean
+      truncation_note?: string
+    }
+
+    expect(output.length).toBeLessThanOrEqual(MAX_TOOL_OUTPUT_CHARS)
+    expect(parsed.verdict).toBe('CONTRADICTED')
+    expect(parsed.reasons.length).toBeLessThan(19)
+    expect(parsed.truncated).toBe(true)
+    expect(parsed.truncation_note).toContain('arrays were shortened')
+  })
+
   it('toBoundedJson never exceeds the bound even without arrays to shrink', () => {
     const blob = { text: 'y'.repeat(10_000) }
     const out = toBoundedJson(blob)

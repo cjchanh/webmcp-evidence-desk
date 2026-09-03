@@ -78,7 +78,7 @@ npm install
 npm run build:manifest   # signs the exhibit manifest; private key -> gitignored keys/
 npm run dev              # local dev server
 
-npm test                 # vitest suite (183 tests)
+npm test                 # vitest suite (189 tests)
 npm run build            # production build -> dist/
 npm run typecheck        # tsc --noEmit
 ```
