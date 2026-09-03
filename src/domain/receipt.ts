@@ -15,6 +15,7 @@ import { throwIfAborted } from './errors.ts'
 import { bytesToHex, hexToBytes, utf8Bytes } from './hex.ts'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import type { Verdict } from './types.ts'
+import type { RecordedHumanDecision } from './decision.ts'
 
 export interface ReceiptSigner {
   /** Sign the canonical payload bytes with the ephemeral session key. */
@@ -73,6 +74,22 @@ export interface SealedReceiptInput {
   manifestSignature: string
   /** Random session identifier (cycle-3): ties envelope to one sealing session. */
   sessionId?: string
+  humanDecision?: RecordedHumanDecision
+  priorBoardDigest?: string
+  qualityChecks?: { passed: number; total: number }
+  evidenceConfidence?: { level: 'HIGH' | 'MEDIUM' | 'LOW'; basis: string }
+  uncoveredScope?: string[]
+}
+
+export interface HumanDecisionReceipt {
+  status: RecordedHumanDecision['status']
+  actor_role: RecordedHumanDecision['actorRole']
+  agent_verdict: Verdict
+  final_verdict: Verdict | null
+  rationale: string | null
+  proposed_at: string
+  decided_at: string
+  waiting_ms: number
 }
 
 export interface SealedReceiptEnvelope {
@@ -81,11 +98,17 @@ export interface SealedReceiptEnvelope {
     sealed_at: string
     session_id?: string
     claim_text: string
-    verdict: Verdict | 'PENDING'
+    verdict: Verdict | 'PENDING' | 'DECLINED'
     accepted_evidence: AcceptedEvidenceItem[]
     tool_log: string[]
     manifest_public_key: string
     manifest_signature: string
+    hard_gate: 'HUMAN_DECISION_REQUIRED'
+    human_decision?: HumanDecisionReceipt
+    prior_board_digest?: string
+    quality_checks?: { passed: number; total: number }
+    evidence_confidence?: { level: 'HIGH' | 'MEDIUM' | 'LOW'; basis: string }
+    uncovered_scope?: string[]
     note: string
   }
   receipt_signature: string
@@ -108,15 +131,37 @@ export async function buildSealedReceipt(
 ): Promise<SealedReceiptEnvelope> {
   throwIfAborted(opts?.signal)
 
+  const humanDecision: HumanDecisionReceipt | undefined = input.humanDecision
+    ? {
+        status: input.humanDecision.status,
+        actor_role: input.humanDecision.actorRole,
+        agent_verdict: input.humanDecision.agentVerdict,
+        final_verdict: input.humanDecision.finalVerdict,
+        rationale: input.humanDecision.rationale,
+        proposed_at: input.humanDecision.proposedAt,
+        decided_at: input.humanDecision.decidedAt,
+        waiting_ms: input.humanDecision.waitingMs
+      }
+    : undefined
+  const recordedVerdict: Verdict | 'PENDING' | 'DECLINED' = input.humanDecision
+    ? input.humanDecision.finalVerdict ?? 'DECLINED'
+    : input.verdict
+
   const receipt = {
     sealed_at: input.sealedAt,
     ...(input.sessionId ? { session_id: input.sessionId } : {}),
     claim_text: input.claimText,
-    verdict: input.verdict,
+    verdict: recordedVerdict,
     accepted_evidence: input.acceptedEvidence,
     tool_log: input.toolLog.map(sanitizeLogLine),
     manifest_public_key: input.manifestPublicKey,
     manifest_signature: input.manifestSignature,
+    hard_gate: 'HUMAN_DECISION_REQUIRED' as const,
+    ...(humanDecision ? { human_decision: humanDecision } : {}),
+    ...(input.priorBoardDigest ? { prior_board_digest: input.priorBoardDigest } : {}),
+    ...(input.qualityChecks ? { quality_checks: input.qualityChecks } : {}),
+    ...(input.evidenceConfidence ? { evidence_confidence: input.evidenceConfidence } : {}),
+    ...(input.uncoveredScope ? { uncovered_scope: input.uncoveredScope } : {}),
     note: 'Tamper-evident local session receipt signed with an ephemeral key. Detects post-download modification; not proof of origin, signer identity, or seal time; not an authoritative legal signature.'
   }
 

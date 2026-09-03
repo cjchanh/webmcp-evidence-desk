@@ -142,9 +142,11 @@ describe('caught sequence through the real page', () => {
     expect(forgedCard.className).toContain('exhibit-arrive')
     expect(forgedCard.querySelectorAll('button')).toHaveLength(0)
 
-    // …the board shake fired with the verdict slam…
+    // Mission Calm keeps the integrity failure calm and literal, without a board shake.
     const boardCard = grid.closest<HTMLElement>('.board-card')
-    expect(boardCard?.classList.contains('board-shake')).toBe(true)
+    expect(boardCard?.classList.contains('board-shake')).toBe(false)
+    expect(document.getElementById('review-status')?.textContent).toBe('ABSTAIN')
+    expect(document.getElementById('abstention-notice')?.hidden).toBe(false)
 
     // …and c. the verdict flips INSUFFICIENT with the integrity missing-entry.
     const stamp = document.getElementById('verdict-stamp')!

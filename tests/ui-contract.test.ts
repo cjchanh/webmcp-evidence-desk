@@ -13,6 +13,7 @@ import { resolve } from 'node:path'
 
 import {
   appendLog,
+  formatFreshnessAge,
   renderExhibitGrid,
   renderReceiptSummary,
   selectPrimaryExhibits,
@@ -135,20 +136,46 @@ describe('caseboard render contract', () => {
 })
 
 describe('receipt summary', () => {
-  it('renders the decision and accepted/rejected counts ahead of raw JSON', () => {
+  it('renders human meaning and decision provenance ahead of raw JSON', () => {
     const summary = document.createElement('div')
     renderReceiptSummary(summary, {
-      verdict: 'CONTRADICTED',
+      agentVerdict: 'CONTRADICTED',
+      humanDecision: 'CORRECTED',
+      finalVerdict: 'SUPPORTED',
+      actorRole: 'local-human-reviewer',
+      waitingMs: 4250,
       proposedCount: 3,
       acceptedCount: 2,
-      rejectedCount: 1
+      rejectedCount: 1,
+      qualityChecks: { passed: 6, total: 6 },
+      evidenceConfidence: {
+        level: 'HIGH',
+        basis: 'Two decisive exhibits are signature verified and source tied.'
+      },
+      uncoveredScope: ['No external identity or authoritative seal-time attestation.']
     })
-    expect(summary.textContent).toContain('Final verdict: CONTRADICTED')
+    expect(summary.textContent).toContain('Human decision: CORRECTED')
+    expect(summary.textContent).toContain('Final verdict: SUPPORTED')
+    expect(summary.textContent).toContain('Agent proposed: CONTRADICTED')
+    expect(summary.textContent).toContain('local-human-reviewer')
+    expect(summary.textContent).toContain('4.25 seconds')
     expect(summary.textContent).toContain('Agent proposed 3 exhibits')
     expect(summary.textContent).toContain('Human accepted 2')
     expect(summary.textContent).toContain('Rejected 1')
+    expect(summary.textContent).toContain('Quality checks: 6/6')
+    expect(summary.textContent).toContain('Evidence confidence: HIGH')
+    expect(summary.textContent).toContain('Uncovered scope')
     expect(summary.textContent).toContain('Evidence integrity: VERIFIED')
     expect(summary.textContent).toContain('Signed locally')
+  })
+})
+
+describe('status freshness', () => {
+  it('ages from now to seconds and then a literal stale state', () => {
+    const updatedAt = Date.parse('2026-09-03T12:00:00.000Z')
+    expect(formatFreshnessAge(updatedAt, updatedAt + 2_000)).toBe('Updated now')
+    expect(formatFreshnessAge(updatedAt, updatedAt + 32_000)).toBe('Updated 32s ago')
+    expect(formatFreshnessAge(updatedAt, updatedAt + 92_000)).toBe('Updated 1m ago · STALE')
   })
 })
 
@@ -223,11 +250,30 @@ describe('collectAcceptedEvidence → sealed receipt integration', () => {
         acceptedEvidence: accepted,
         toolLog: ['[SYS] boot'],
         manifestPublicKey: 'aa',
-        manifestSignature: 'bb'
+        manifestSignature: 'bb',
+        humanDecision: {
+          status: 'DECLINED',
+          actorRole: 'local-human-reviewer',
+          agentVerdict: 'INSUFFICIENT',
+          finalVerdict: null,
+          rationale: null,
+          proposedAt: '2026-08-24T23:59:58.000Z',
+          decidedAt: '2026-08-25T00:00:00.000Z',
+          waitingMs: 2000
+        },
+        priorBoardDigest: 'sha256:board-state',
+        qualityChecks: { passed: 6, total: 6 },
+        evidenceConfidence: { level: 'LOW', basis: 'Required evidence is missing.' },
+        uncoveredScope: ['Missing inspection report.']
       },
       signer
     )
     expect(envelope.receipt.accepted_evidence).toEqual(accepted)
+    expect(envelope.receipt.human_decision?.status).toBe('DECLINED')
+    expect(envelope.receipt.verdict).toBe('DECLINED')
+    expect(envelope.receipt.prior_board_digest).toBe('sha256:board-state')
+    expect(envelope.receipt.hard_gate).toBe('HUMAN_DECISION_REQUIRED')
+    expect(envelope.receipt.quality_checks).toEqual({ passed: 6, total: 6 })
     expect(
       envelope.receipt.accepted_evidence.some((a) => a.exhibit_id === 'EX-999')
     ).toBe(false)

@@ -33,10 +33,10 @@
 
     <section id="judge-stage" class="judge-stage" aria-labelledby="page-title">
       <div class="judge-brief">
-        <p class="eyebrow">CASE HX-17 · LIVE WEBMCP REVIEW</p>
-        <h1 id="page-title" class="case-question">Your agent investigates.<br />You keep the verdict.</h1>
+        <p class="eyebrow">CASE HX-17 · PROOF BEFORE ACTION</p>
+        <h1 id="page-title" class="case-question">Can an agent prove its answer before you act?</h1>
         <p class="lede">
-          Evidence Desk turns a contested claim into a visible, source-tied agent review—then stops at the human decision boundary.
+          Watch the agent inspect signed evidence, expose the decisive conflict, and stop before the human decision.
         </p>
         <div class="claim-document">
           <p class="document-label">THE CONTESTED CLAIM</p>
@@ -44,13 +44,14 @@
             “The vendor provided the required inspection report before acceptance.”
           </blockquote>
         </div>
-        <p id="trust-contract" class="trust-contract">Agent proposes. Human decides. Evidence preserves what happened.</p>
+        <p id="trust-contract" class="trust-contract">Agent proposes. Human decides. The receipt preserves both.</p>
         <div class="claim-actions">
-          <button id="btn-copy-judge-prompt" type="button" class="primary">COPY AGENT BRIEFING</button>
+          <button id="btn-copy-judge-prompt" type="button" class="primary">INVESTIGATE WITH MY AGENT</button>
           <button id="btn-run-sim-inline" type="button" hidden>WATCH 20-SECOND GUIDED REPLAY</button>
         </div>
         <span id="copy-feedback" class="feedback" role="status"></span>
-        <p class="hint">Paste the briefing into an agent with this page open. Four real tool calls appear at right.</p>
+        <p class="hint">Copies a self-contained four-tool briefing. Real calls appear in the live record.</p>
+        <p id="trust-strip" class="trust-strip" aria-label="Trust summary">13 VERIFIED · 4 WEBMCP TOOLS · HUMAN-ONLY FINAL ACTION</p>
       </div>
 
       <div class="card live-review-panel" aria-labelledby="log-heading">
@@ -62,10 +63,11 @@
           <span class="live-mark">LIVE</span>
         </div>
         <div class="review-status-shell" aria-live="polite">
-          <span class="status-pulse" aria-hidden="true"></span>
+          <span id="review-state-signal" class="status-signal" aria-hidden="true">○</span>
           <div>
-            <strong id="review-status">AWAITING AGENT</strong>
+            <strong id="review-status">INITIAL</strong>
             <span id="review-status-detail">Copy the briefing to start a real WebMCP review.</span>
+            <span class="status-meta"><span id="review-freshness">Updated now</span> · <a id="review-detail-link" href="#tool-log">View receipt trail</a></span>
           </div>
         </div>
         <ol id="tool-log" class="tool-log"></ol>
@@ -90,7 +92,7 @@
 
     <ol class="how-strip" aria-label="Evidence Desk trust flow">
       <li><span class="step-num">1</span><span><strong>AGENT INVESTIGATES</strong><br />search · inspect · evaluate · propose</span></li>
-      <li><span class="step-num">2</span><span><strong>HUMAN ADJUDICATES</strong><br />pin · reject · accept verdict</span></li>
+      <li><span class="step-num">2</span><span><strong>HUMAN ADJUDICATES</strong><br />approve · correct · decline</span></li>
       <li><span class="step-num">3</span><span><strong>EVIDENCE PRESERVES</strong><br />hashes · manifest · local receipt</span></li>
     </ol>
 
@@ -108,6 +110,16 @@
       <div id="timeline-spine" class="timeline-spine" role="img" aria-label="Exhibit dates plotted across the case window; hollow rings mark contested dates"></div>
       <div id="exhibit-grid" class="exhibit-grid primary-grid" aria-label="Decisive and proposed exhibit cards"></div>
 
+      <aside id="abstention-notice" class="abstention-notice" aria-labelledby="abstention-title" hidden>
+        <p class="state-label">ABSTAIN</p>
+        <h3 id="abstention-title">The agent does not have enough verified evidence to decide.</h3>
+        <dl>
+          <div><dt>Reason</dt><dd id="abstention-reason">The available record does not resolve the claim.</dd></div>
+          <div><dt>Missing evidence</dt><dd id="abstention-missing">Not reported.</dd></div>
+          <div><dt>What changes the answer</dt><dd id="abstention-next-action">Add the named verified record, then evaluate again.</dd></div>
+        </dl>
+      </aside>
+
       <details id="all-exhibits-disclosure" class="packet-disclosure">
         <summary>OPEN THE FULL SIGNED PACKET · 13 EXHIBITS</summary>
         <p class="hint">Every span below was checked client-side against the signed manifest before display.</p>
@@ -117,10 +129,33 @@
       <div class="human-decision-panel">
         <div>
           <p class="eyebrow">FINAL VERDICT BOUNDARY</p>
-          <p id="human-authority" class="human-authority">Only you can accept the verdict and seal the receipt.</p>
+          <p id="human-authority" class="human-authority">Only you can approve, correct, or decline the agent verdict.</p>
           <span id="verdict-accept-status" class="feedback" role="status">Awaiting an agent evaluation.</span>
         </div>
-        <button id="btn-accept-verdict" type="button" class="decision-button" disabled>ACCEPT AGENT VERDICT</button>
+        <div class="decision-actions" aria-label="Human verdict actions">
+          <button id="btn-approve-verdict" type="button" class="primary decision-button" disabled>APPROVE AGENT VERDICT</button>
+          <button id="btn-correct-verdict" type="button" class="decision-button" disabled>CORRECT VERDICT</button>
+          <button id="btn-decline-verdict" type="button" class="decision-button decision-decline" disabled>DECLINE PROPOSAL</button>
+        </div>
+        <form id="correction-form" class="correction-form" hidden>
+          <div>
+            <label for="corrected-verdict">Correct final verdict</label>
+            <select id="corrected-verdict" name="corrected-verdict">
+              <option value="SUPPORTED">SUPPORTED</option>
+              <option value="CONTRADICTED">CONTRADICTED</option>
+              <option value="INSUFFICIENT">INSUFFICIENT</option>
+            </select>
+          </div>
+          <div>
+            <label for="correction-rationale">Why the human record differs</label>
+            <textarea id="correction-rationale" name="correction-rationale" required maxlength="500"></textarea>
+          </div>
+          <div class="correction-actions">
+            <button type="submit" class="primary">RECORD CORRECTION</button>
+            <button id="btn-cancel-correction" type="button">CANCEL</button>
+          </div>
+          <span id="correction-error" class="feedback correction-error" role="alert"></span>
+        </form>
       </div>
     </section>
 
@@ -128,7 +163,7 @@
       <div>
         <p class="eyebrow">PRESERVE THE DECISION</p>
         <h2 id="seal-heading">Seal a local, tamper-evident receipt</h2>
-        <p class="hint">Records the human-accepted verdict, accepted evidence hashes, and the tool-call trail. No network. Not an authoritative legal signature.</p>
+        <p class="hint">Records the human decision, accepted evidence hashes, and the tool-call trail. No network. Not an authoritative legal signature.</p>
       </div>
       <div class="seal-actions">
         <button id="btn-seal-receipt" type="button" class="primary big">SEAL RECEIPT</button>

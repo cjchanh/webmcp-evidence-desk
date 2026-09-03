@@ -10,57 +10,11 @@ import type { BoardState, ClaimEvaluation, Exhibit, Verdict } from '../domain/ty
 
 export type LogTag = 'WEBMCP' | 'SIM' | 'HUMAN' | 'SYS' | 'ERR'
 
-/** True when the operator asked the OS for reduced motion. Typing is JS-driven
- * (timers, not CSS), so the global CSS kill block cannot cover it — gate here. */
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  )
-}
-
-// --- provenance rail typing (P1) ---------------------------------------------
-// Only the NEWEST entry types; any newer arrival completes the previous one
-// instantly. One click anywhere on the log finishes the active entry.
-
-interface ActiveTyping {
-  finish(): void
-}
-
-let activeTyping: ActiveTyping | null = null
-const typingLogs = new WeakSet<HTMLElement>()
-
-function typeLogText(logEl: HTMLElement, textSpan: HTMLElement, text: string): void {
-  activeTyping?.finish()
-  if (prefersReducedMotion()) {
-    textSpan.textContent = text
-    return
-  }
-
-  const caret = el('span', 'log-caret')
-  caret.setAttribute('aria-hidden', 'true')
-  textSpan.after(caret)
-
-  let i = 0
-  const finish = () => {
-    clearInterval(timer)
-    textSpan.textContent = text
-    caret.remove()
-    if (activeTyping && activeTyping.finish === finish) activeTyping = null
-  }
-  const timer = setInterval(() => {
-    i += 1
-    textSpan.textContent = text.slice(0, i)
-    logEl.scrollTop = logEl.scrollHeight
-    if (i >= text.length) finish()
-  }, 12)
-  activeTyping = { finish }
-
-  // Click-to-complete: one listener per log element, installed once.
-  if (!typingLogs.has(logEl)) {
-    typingLogs.add(logEl)
-    logEl.addEventListener('click', () => activeTyping?.finish())
-  }
+export function formatFreshnessAge(updatedAtMs: number, nowMs = Date.now()): string {
+  const elapsedMs = Math.max(0, nowMs - updatedAtMs)
+  if (elapsedMs < 5_000) return 'Updated now'
+  if (elapsedMs < 60_000) return `Updated ${Math.floor(elapsedMs / 1_000)}s ago`
+  return `Updated ${Math.floor(elapsedMs / 60_000)}m ago · STALE`
 }
 
 export function appendLog(logEl: HTMLOListElement, tag: LogTag, text: string): HTMLLIElement {
@@ -69,15 +23,13 @@ export function appendLog(logEl: HTMLOListElement, tag: LogTag, text: string): H
   // escaping and duplicated the tag already rendered via textContent.
   const tagSpan = el('span', `log-tag log-tag-${tag.toLowerCase()}`, `[${tag}]`)
   const textSpan = el('span', 'log-text')
+  textSpan.textContent = text
   li.append(tagSpan, textSpan)
   logEl.appendChild(li)
   logEl.scrollTop = logEl.scrollHeight
-  // Cycle-3 a11y: single polite announcement of the LATEST entry instead of an
-  // aria-live storm over every burst line. The live region receives the FULL
-  // text immediately — visual typing is presentation, never a content delay.
+  // Single polite announcement of the latest entry avoids an aria-live storm.
   const liveStatus = document.getElementById('log-live-status')
   if (liveStatus) liveStatus.textContent = `[${tag}] ${text}`
-  typeLogText(logEl, textSpan, text)
   return li
 }
 
@@ -90,12 +42,6 @@ export function setVerdict(
       ? `VERDICT: INSUFFICIENT — missing: ${evaluation.missing.join(', ')}`
       : `VERDICT: ${evaluation.verdict}`
   stampEl.className = `verdict-stamp verdict-${evaluation.verdict.toLowerCase()}`
-  // P0 signature sequence: every verdict through this path is non-PENDING
-  // (Verdict = SUPPORTED | CONTRADICTED | INSUFFICIENT; the PENDING stamp is
-  // written directly by boot). className reset above clears any prior slam;
-  // forced reflow lets consecutive verdicts retrigger.
-  void stampEl.offsetWidth
-  stampEl.classList.add('verdict-slam')
 }
 
 export interface ExhibitCardCallbacks {
@@ -230,33 +176,38 @@ export function renderExhibitGrid(
   }
 }
 
-/** P2 — receipt preview reveals line-by-line on open. Each JSON line becomes a
- * block span with a staggered animation-delay; the stagger caps at the first
- * MAX_STAGGER_LINES lines so the whole receipt is readable after one wave.
- * All content still enters via textContent. */
-const MAX_STAGGER_LINES = 12
-
 export function renderReceiptPreview(previewEl: HTMLElement, jsonText: string): void {
-  previewEl.textContent = ''
-  const lines = jsonText.split('\n')
-  lines.forEach((line, i) => {
-    const lineSpan = el('span', 'receipt-line', line)
-    lineSpan.style.animationDelay = `${Math.min(i, MAX_STAGGER_LINES - 1) * 40}ms`
-    previewEl.appendChild(lineSpan)
-  })
+  previewEl.textContent = jsonText
 }
 
 export function renderReceiptSummary(
   summaryEl: HTMLElement,
   summary: {
-    verdict: Verdict
+    agentVerdict: Verdict
+    humanDecision: 'APPROVED' | 'CORRECTED' | 'DECLINED'
+    finalVerdict: Verdict | null
+    actorRole: string
+    waitingMs: number
     proposedCount: number
     acceptedCount: number
     rejectedCount: number
+    qualityChecks: { passed: number; total: number }
+    evidenceConfidence: { level: 'HIGH' | 'MEDIUM' | 'LOW'; basis: string }
+    uncoveredScope: string[]
   }
 ): void {
   summaryEl.textContent = ''
-  const heading = el('p', 'receipt-summary-verdict', `Final verdict: ${summary.verdict}`)
+  const decision = el('p', 'receipt-summary-state', `Human decision: ${summary.humanDecision}`)
+  const heading = el(
+    'p',
+    'receipt-summary-verdict',
+    summary.finalVerdict ? `Final verdict: ${summary.finalVerdict}` : 'Final verdict: NOT ADOPTED'
+  )
+  const provenance = el(
+    'p',
+    'receipt-summary-provenance',
+    `Agent proposed: ${summary.agentVerdict} · Actor: ${summary.actorRole} · Wait: ${(summary.waitingMs / 1000).toFixed(2)} seconds`
+  )
   const counts = el(
     'p',
     'receipt-summary-counts',
@@ -268,7 +219,17 @@ export function renderReceiptSummary(
     'receipt-summary-integrity',
     'Evidence integrity: VERIFIED · Signed locally · accepted hashes anchored in the signed manifest'
   )
-  summaryEl.append(heading, counts, integrity)
+  const quality = el(
+    'p',
+    'receipt-summary-quality',
+    `Quality checks: ${summary.qualityChecks.passed}/${summary.qualityChecks.total} · Evidence confidence: ${summary.evidenceConfidence.level} — ${summary.evidenceConfidence.basis}`
+  )
+  const scope = el(
+    'p',
+    'receipt-summary-scope',
+    `Uncovered scope: ${summary.uncoveredScope.join(' ') || 'None reported.'}`
+  )
+  summaryEl.append(decision, heading, provenance, counts, integrity, quality, scope)
 }
 
 /** Arrow-key cycling across exhibit cards (roving focus). */

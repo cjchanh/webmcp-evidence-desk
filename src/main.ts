@@ -18,6 +18,15 @@ import {
 import { buildSealedReceipt, collectAcceptedEvidence, verifySealedReceiptEnvelope } from './domain/receipt.ts'
 import { buildForgedExhibitCandidate, probeForgedExhibit } from './domain/forge.ts'
 import type { SealedReceiptEnvelope } from './domain/receipt.ts'
+import {
+  approveDecision,
+  correctDecision,
+  createPendingDecision,
+  declineDecision,
+  type PendingHumanDecision,
+  type RecordedHumanDecision
+} from './domain/decision.ts'
+import { sha256Hex } from './domain/hex.ts'
 import type {
   BoardState,
   ClaimEvaluation,
@@ -33,6 +42,7 @@ import { runSimulatedAgent } from './simulated/runSimulatedAgent.ts'
 import {
   appendLog,
   cycleExhibits,
+  formatFreshnessAge,
   renderExhibitGrid,
   renderReceiptPreview,
   renderReceiptSummary,
@@ -58,7 +68,7 @@ const JUDGE_PROMPT = [
   '3. evaluate_claim — return SUPPORTED / CONTRADICTED / INSUFFICIENT with span-tied reasons.',
   "4. update_caseboard — action:'add' with exhibit_id and stance (supports|contradicts).",
   'Expected flow: search first, inspect both sides, then evaluate; added exhibits appear on the caseboard.',
-  'Pin, remove, reject, and seal are human-exclusive controls.'
+  'Pin, remove, reject, approve, correct, decline, and seal are human-exclusive controls.'
 ].join('\n')
 
 interface AppState {
@@ -68,7 +78,8 @@ interface AppState {
   forged: Exhibit[]
   quarantinedIds: Set<string>
   verdict: Verdict | 'PENDING'
-  verdictAccepted: boolean
+  pendingDecision: PendingHumanDecision | null
+  humanDecision: RecordedHumanDecision | null
   proposalCount: number
   toolLog: string[]
   lastReceipt: SealedReceiptEnvelope | null
@@ -80,7 +91,8 @@ const state: AppState = {
   forged: [],
   quarantinedIds: new Set<string>(),
   verdict: 'PENDING',
-  verdictAccepted: false,
+  pendingDecision: null,
+  humanDecision: null,
   proposalCount: 0,
   toolLog: [],
   lastReceipt: null
@@ -108,8 +120,21 @@ const els = {
   grid: byId<HTMLDivElement>('exhibit-grid'),
   packetGrid: byId<HTMLDivElement>('packet-grid'),
   timeline: byId<HTMLDivElement>('timeline-spine'),
-  acceptVerdictBtn: byId<HTMLButtonElement>('btn-accept-verdict'),
+  approveVerdictBtn: byId<HTMLButtonElement>('btn-approve-verdict'),
+  correctVerdictBtn: byId<HTMLButtonElement>('btn-correct-verdict'),
+  declineVerdictBtn: byId<HTMLButtonElement>('btn-decline-verdict'),
+  correctionForm: byId<HTMLFormElement>('correction-form'),
+  correctedVerdict: byId<HTMLSelectElement>('corrected-verdict'),
+  correctionRationale: byId<HTMLTextAreaElement>('correction-rationale'),
+  correctionError: byId<HTMLSpanElement>('correction-error'),
+  cancelCorrectionBtn: byId<HTMLButtonElement>('btn-cancel-correction'),
   verdictAcceptStatus: byId<HTMLSpanElement>('verdict-accept-status'),
+  abstentionNotice: byId<HTMLElement>('abstention-notice'),
+  abstentionReason: byId<HTMLElement>('abstention-reason'),
+  abstentionMissing: byId<HTMLElement>('abstention-missing'),
+  abstentionNextAction: byId<HTMLElement>('abstention-next-action'),
+  reviewStateSignal: byId<HTMLElement>('review-state-signal'),
+  reviewFreshness: byId<HTMLElement>('review-freshness'),
   sealBtn: byId<HTMLButtonElement>('btn-seal-receipt'),
   sealStatus: byId<HTMLSpanElement>('seal-status'),
   verifyReceiptBtn: byId<HTMLButtonElement>('btn-verify-receipt'),
@@ -163,9 +188,34 @@ function showSealStatus(text: string): void {
 // so an uncapped log means an unbounded receipt on long judge sessions.
 const MAX_LOG_ENTRIES = 400
 
+const STATUS_SIGNALS: Record<string, string> = {
+  INITIAL: '○',
+  LOADING: '◌',
+  'NEEDS APPROVAL': '◇',
+  ABSTAIN: '⊘',
+  SUCCESS: '✓',
+  RECEIPTED: '◆',
+  CANCELLED: '×',
+  DENIED: '!',
+  FAILED: '!'
+}
+
+let reviewUpdatedAt = Date.now()
+let reviewFreshnessTimer: ReturnType<typeof setTimeout> | undefined
+
+function refreshReviewFreshness(): void {
+  els.reviewFreshness.textContent = formatFreshnessAge(reviewUpdatedAt)
+  if (reviewFreshnessTimer) clearTimeout(reviewFreshnessTimer)
+  reviewFreshnessTimer = setTimeout(refreshReviewFreshness, 15_000)
+}
+
 function setReviewStatus(status: string, detail: string): void {
   els.reviewStatus.textContent = status
   els.reviewStatusDetail.textContent = detail
+  els.reviewStateSignal.textContent = STATUS_SIGNALS[status] ?? '•'
+  els.reviewStateSignal.dataset.state = status.toLowerCase().replace(/\s+/g, '-')
+  reviewUpdatedAt = Date.now()
+  refreshReviewFreshness()
 }
 
 // --- board ------------------------------------------------------------------
@@ -190,7 +240,7 @@ function addToBoardFromAgent(exhibitId: string, stance: 'supports' | 'contradict
   if (result.ok) {
     state.board = result.board
     state.proposalCount += 1
-    invalidateVerdictAcceptance('Agent proposal changed — review the final verdict again.')
+    invalidateHumanDecision('Agent proposal changed — review the final verdict again.')
     pendingArrival.add(exhibitId)
     renderGrid()
   } else if (result.reason !== 'duplicate_entry') {
@@ -203,7 +253,7 @@ function humanAction(kind: 'pin' | 'remove' | 'reject', exhibitId: string): void
   const result = applyHumanAction(state.board, { action: kind, exhibit_id: exhibitId })
   if (result.ok) {
     state.board = result.board
-    invalidateVerdictAcceptance('Evidence changed — review the final verdict again.')
+    invalidateHumanDecision('Evidence changed — review the final verdict again.')
     log('HUMAN', `${kind} ${exhibitId}`)
     renderGrid()
   } else {
@@ -244,53 +294,123 @@ function renderGrid(): void {
 
 // --- verdict ----------------------------------------------------------------
 
-/** P0 signature sequence: the stamp SLAMs (caseboard) and the board shakes. */
-function shakeBoard(): void {
-  const boardCard = els.grid.closest<HTMLElement>('.board-card')
-  if (!boardCard) return
-  boardCard.classList.remove('board-shake')
-  void boardCard.offsetWidth
-  boardCard.classList.add('board-shake')
-  boardCard.addEventListener(
-    'animationend',
-    () => boardCard.classList.remove('board-shake'),
-    { once: true }
-  )
+function setDecisionButtons(disabled: boolean): void {
+  els.approveVerdictBtn.disabled = disabled
+  els.correctVerdictBtn.disabled = disabled
+  els.declineVerdictBtn.disabled = disabled
 }
 
 function applyVerdict(evaluation: ClaimEvaluation): void {
   state.verdict = evaluation.verdict
-  state.verdictAccepted = false
+  state.pendingDecision = createPendingDecision(evaluation.verdict, new Date().toISOString())
+  state.humanDecision = null
   setVerdict(els.verdictStamp, evaluation)
-  els.acceptVerdictBtn.disabled = false
-  els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
-  els.verdictAcceptStatus.textContent = `Agent proposes ${evaluation.verdict}. Human acceptance required.`
-  setReviewStatus(
-    'AGENT ANALYSIS COMPLETE — YOUR DECISION IS REQUIRED',
-    `${evaluation.reasons.length} source-tied reason${evaluation.reasons.length === 1 ? '' : 's'} returned. Review the board below.`
-  )
-  shakeBoard()
-}
-
-function invalidateVerdictAcceptance(message: string): void {
-  if (!state.verdictAccepted) return
-  state.verdictAccepted = false
-  els.acceptVerdictBtn.disabled = state.verdict === 'PENDING'
-  els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
-  els.verdictAcceptStatus.textContent = message
-}
-
-function acceptVerdict(): void {
-  if (state.verdict === 'PENDING') {
-    els.verdictAcceptStatus.textContent = 'No agent verdict exists yet.'
-    return
+  setDecisionButtons(false)
+  els.correctionForm.hidden = true
+  els.correctionError.textContent = ''
+  els.verdictAcceptStatus.textContent = `Agent proposes ${evaluation.verdict}. Human decision required.`
+  if (evaluation.verdict === 'INSUFFICIENT') {
+    els.abstentionNotice.hidden = false
+    els.abstentionReason.textContent =
+      evaluation.reasons[0]?.verdict_basis ?? 'The verified record does not resolve the claim.'
+    els.abstentionMissing.textContent = evaluation.missing.length
+      ? evaluation.missing.join(', ')
+      : 'The evaluator did not identify a sufficient deciding record.'
+    els.abstentionNextAction.textContent = evaluation.missing.length
+      ? `Add ${evaluation.missing.join(', ')}, verify it, then evaluate again.`
+      : 'Inspect another verified source or decline the proposal.'
+    setReviewStatus(
+      'ABSTAIN',
+      'Agent analysis complete. Your decision is required. The receipt will preserve what is missing.'
+    )
+  } else {
+    els.abstentionNotice.hidden = true
+    setReviewStatus(
+      'NEEDS APPROVAL',
+      `Agent analysis complete. Your decision is required. ${evaluation.reasons.length} source-tied reason${evaluation.reasons.length === 1 ? '' : 's'} returned.`
+    )
   }
-  state.verdictAccepted = true
-  els.acceptVerdictBtn.disabled = true
-  els.acceptVerdictBtn.textContent = 'VERDICT ACCEPTED BY HUMAN'
-  els.verdictAcceptStatus.textContent = `${state.verdict} accepted by human. Receipt can now be sealed.`
-  setReviewStatus('HUMAN DECISION RECORDED', `${state.verdict} accepted — ready to seal locally.`)
-  log('HUMAN', `accepted final verdict: ${state.verdict}`)
+}
+
+function invalidateHumanDecision(message: string): void {
+  if (!state.humanDecision) return
+  state.humanDecision = null
+  state.pendingDecision =
+    state.verdict === 'PENDING'
+      ? null
+      : createPendingDecision(state.verdict, new Date().toISOString())
+  setDecisionButtons(state.verdict === 'PENDING')
+  els.verdictAcceptStatus.textContent = message
+  setReviewStatus('NEEDS APPROVAL', 'Evidence changed. Review the proposal and record a new human decision.')
+}
+
+function pendingDecision(): PendingHumanDecision | null {
+  if (!state.pendingDecision || state.verdict === 'PENDING') {
+    els.verdictAcceptStatus.textContent = 'No agent verdict exists yet.'
+    return null
+  }
+  return state.pendingDecision
+}
+
+function recordHumanDecision(decision: RecordedHumanDecision): void {
+  state.humanDecision = decision
+  setDecisionButtons(true)
+  els.correctionForm.hidden = true
+  els.correctionError.textContent = ''
+  const outcome =
+    decision.status === 'DECLINED'
+      ? `${decision.agentVerdict} proposal declined. No final verdict adopted.`
+      : `${decision.finalVerdict} recorded by human.`
+  els.verdictAcceptStatus.textContent = `${decision.status} — ${outcome} Receipt can now be sealed.`
+  setReviewStatus('SUCCESS', `Human decision recorded: ${decision.status}. Ready to seal locally.`)
+  log(
+    'HUMAN',
+    `${decision.status.toLowerCase()} agent verdict ${decision.agentVerdict}` +
+      (decision.finalVerdict ? ` → ${decision.finalVerdict}` : '')
+  )
+}
+
+function approveVerdict(): void {
+  const pending = pendingDecision()
+  if (!pending) return
+  recordHumanDecision(approveDecision(pending, new Date().toISOString()))
+}
+
+function openCorrection(): void {
+  const pending = pendingDecision()
+  if (!pending) return
+  const alternative = (['SUPPORTED', 'CONTRADICTED', 'INSUFFICIENT'] as Verdict[]).find(
+    (verdict) => verdict !== pending.agentVerdict
+  )
+  if (alternative) els.correctedVerdict.value = alternative
+  els.correctionRationale.value = ''
+  els.correctionError.textContent = ''
+  els.correctionForm.hidden = false
+  els.correctionRationale.focus()
+}
+
+function submitCorrection(event: SubmitEvent): void {
+  event.preventDefault()
+  const pending = pendingDecision()
+  if (!pending) return
+  try {
+    recordHumanDecision(
+      correctDecision(
+        pending,
+        els.correctedVerdict.value as Verdict,
+        els.correctionRationale.value,
+        new Date().toISOString()
+      )
+    )
+  } catch (error) {
+    els.correctionError.textContent = (error as Error).message
+  }
+}
+
+function declineVerdict(): void {
+  const pending = pendingDecision()
+  if (!pending) return
+  recordHumanDecision(declineDecision(pending, new Date().toISOString()))
 }
 
 // --- simulated lane ---------------------------------------------------------
@@ -308,7 +428,7 @@ async function runSimulated(): Promise<void> {
   }
   simRunning = true
   els.simRibbon.hidden = false
-  setReviewStatus('GUIDED REPLAY RUNNING', 'Simulated lane is labeled and does not count as WebMCP proof.')
+  setReviewStatus('LOADING', 'Guided replay is simulated and does not count as WebMCP proof.')
   try {
     await runSimulatedAgent(
       {
@@ -390,9 +510,9 @@ async function sealReceipt(): Promise<void> {
     log('ERR', 'seal refused: no evaluation yet (verdict PENDING)')
     return
   }
-  if (!state.verdictAccepted) {
-    showSealStatus('SEAL REFUSED — a human must accept the final verdict first.')
-    log('ERR', 'seal refused: final verdict has not been accepted by a human')
+  if (!state.humanDecision) {
+    showSealStatus('SEAL REFUSED — a human must approve, correct, or decline the final verdict first.')
+    log('ERR', 'seal refused: no human decision has been recorded')
     return
   }
 
@@ -410,26 +530,69 @@ async function sealReceipt(): Promise<void> {
 
   sealInFlight = true
   try {
+    const qualitySignals = [
+      state.humanDecision !== null,
+      true, // guarded above: PENDING cannot reach the seal path
+      state.quarantinedIds.size === 0,
+      accepted.length > 0,
+      state.toolLog.some((entry) => entry.includes('evaluate_claim')),
+      accepted.every((item) => item.span_sha256s.length > 0)
+    ]
+    const qualityChecks = {
+      passed: qualitySignals.filter(Boolean).length,
+      total: qualitySignals.length
+    }
+    const evidenceConfidence =
+      state.verdict === 'INSUFFICIENT'
+        ? {
+            level: 'LOW' as const,
+            basis: 'The evaluator abstained because the verified record is incomplete.'
+          }
+        : accepted.length >= 2
+          ? {
+              level: 'HIGH' as const,
+              basis: 'At least two accepted exhibits are signature verified and source tied.'
+            }
+          : {
+              level: 'MEDIUM' as const,
+              basis: 'The decision rests on one accepted signature-verified exhibit.'
+            }
+    const priorBoardDigest = `sha256:${await sha256Hex(JSON.stringify(state.board.entries))}`
     const envelope = await buildSealedReceipt(
       {
         sealedAt: new Date().toISOString(),
         sessionId: sessionId(),
         claimText: HERO_CLAIM,
-        verdict: state.verdict,
+        verdict: state.humanDecision.finalVerdict ?? state.humanDecision.agentVerdict,
         acceptedEvidence: accepted,
         toolLog: state.toolLog,
         manifestPublicKey: MANIFEST.publicKey,
-        manifestSignature: MANIFEST.signature
+        manifestSignature: MANIFEST.signature,
+        humanDecision: state.humanDecision,
+        priorBoardDigest,
+        qualityChecks,
+        evidenceConfidence,
+        uncoveredScope: [
+          'No external signer identity or authoritative seal-time attestation.',
+          'Synthetic case evidence only; no legal conclusion is asserted.'
+        ]
       },
       makeEphemeralSigner()
     )
 
     state.lastReceipt = envelope
     renderReceiptSummary(els.receiptSummary, {
-      verdict: envelope.receipt.verdict as Verdict,
+      agentVerdict: state.humanDecision.agentVerdict,
+      humanDecision: state.humanDecision.status,
+      finalVerdict: state.humanDecision.finalVerdict,
+      actorRole: state.humanDecision.actorRole,
+      waitingMs: state.humanDecision.waitingMs,
       proposedCount: state.proposalCount,
       acceptedCount: accepted.length,
-      rejectedCount: state.board.entries.filter((entry) => entry.status === 'rejected').length
+      rejectedCount: state.board.entries.filter((entry) => entry.status === 'rejected').length,
+      qualityChecks,
+      evidenceConfidence,
+      uncoveredScope: envelope.receipt.uncovered_scope ?? []
     })
     renderReceiptPreview(els.receiptPreview, JSON.stringify(envelope, null, 2))
     els.modalBackdrop.hidden = false
@@ -437,6 +600,7 @@ async function sealReceipt(): Promise<void> {
     els.closeModalBtn.focus()
     showSealStatus('')
     log('HUMAN', `receipt sealed over ${accepted.length} accepted exhibits`)
+    setReviewStatus('RECEIPTED', 'Local receipt sealed. Human meaning appears before the signed JSON.')
   } catch (err) {
     showSealStatus('SEAL FAILED — see tool log.')
     log('ERR', `seal failed: ${(err as Error)?.message ?? String(err)}`)
@@ -525,8 +689,8 @@ function trapModalFocus(e: KeyboardEvent, backdrop: HTMLElement): void {
 // The adversarial challenge: the judge edits EX-002's exact signed spans and
 // submits. The probe recomputes each span's sha256 — what the hash WOULD be —
 // and compares it to the hash the manifest actually recorded. Any edit fails
-// by construction, and the full caught sequence fires: quarantined card with
-// arrival animation, board shake, INSUFFICIENT verdict, sealed-shut seal gate.
+// by construction, and the full caught sequence fires: a quarantined card,
+// literal ABSTAIN state, INSUFFICIENT verdict, and sealed-shut receipt gate.
 
 const FORGE_TARGET_ID = 'EX-002'
 let lastFocusedBeforeForge: HTMLElement | null = null
@@ -630,15 +794,17 @@ async function resetCase(): Promise<void> {
     state.forged = []
     state.board = createBoard()
     state.verdict = 'PENDING'
-    state.verdictAccepted = false
+    state.pendingDecision = null
+    state.humanDecision = null
     state.proposalCount = 0
     pendingArrival.clear()
     els.verdictStamp.textContent = 'VERDICT: PENDING REVIEW'
     els.verdictStamp.className = 'verdict-stamp verdict-pending'
-    els.acceptVerdictBtn.disabled = true
-    els.acceptVerdictBtn.textContent = 'ACCEPT AGENT VERDICT'
+    setDecisionButtons(true)
+    els.correctionForm.hidden = true
+    els.abstentionNotice.hidden = true
     els.verdictAcceptStatus.textContent = 'Awaiting an agent evaluation.'
-    setReviewStatus('AWAITING AGENT', 'Copy the briefing to start a real WebMCP review.')
+    setReviewStatus('INITIAL', 'Copy the briefing to start a real WebMCP review.')
     renderGrid()
     renderTimeline(els.timeline, state.verified)
     closeForgeBench()
@@ -653,26 +819,6 @@ async function resetCase(): Promise<void> {
 
 // --- boot -------------------------------------------------------------------
 
-/** P0 hash-verification sweep: one shimmer pass across each exhibit id/hash
- * line, staggered 60ms per card, terminating solid. Runs ONCE after
- * verifyManifest passes; later re-renders never re-add the class. Under the
- * global reduced-motion kill block no animation runs and the class is inert. */
-function runHashSweep(): void {
-  const idLines = document.querySelectorAll<HTMLElement>('#exhibit-grid .exhibit-id, #packet-grid .exhibit-id')
-  idLines.forEach((line, i) => {
-    line.classList.add('hash-sweep')
-    line.style.animationDelay = `${i * 60}ms`
-    line.addEventListener(
-      'animationend',
-      () => {
-        line.classList.remove('hash-sweep')
-        line.style.animationDelay = ''
-      },
-      { once: true }
-    )
-  })
-}
-
 async function boot(): Promise<void> {
   els.verdictStamp.textContent = 'VERIFYING EVIDENCE…'
   log('SYS', 'verifying signed manifest client-side')
@@ -684,6 +830,7 @@ async function boot(): Promise<void> {
     log('ERR', `boot failed: ${(err as Error)?.message ?? String(err)}`)
     els.verdictStamp.textContent = 'BOOT FAILED — evidence could not be verified'
     els.webmcpStatus.textContent = 'WEBMCP: OFFLINE'
+    setReviewStatus('FAILED', 'Evidence verification failed. Reload to retry.')
     showSealStatus('BOOT FAILED — reload or run the simulated review.')
   }
 }
@@ -713,7 +860,6 @@ async function bootInner(): Promise<void> {
   }
 
   renderGrid()
-  runHashSweep()
   renderTimeline(els.timeline, state.verified)
 
   // Sim button appears only after verification lands (cycle-4 ordering fix).
@@ -731,18 +877,19 @@ async function bootInner(): Promise<void> {
     onLifecycle: (event) => {
       log('WEBMCP', event.summary)
       if (event.phase === 'started') {
-        setReviewStatus('AGENT INVESTIGATING', `${event.toolName} is running…`)
+        setReviewStatus('LOADING', `${event.toolName} is running…`)
       } else if (event.phase === 'completed' && event.toolName !== 'evaluate_claim') {
         if (state.verdict !== 'PENDING' && event.toolName === 'update_caseboard') {
           setReviewStatus(
-            'AGENT ANALYSIS COMPLETE — YOUR DECISION IS REQUIRED',
-            'Evidence proposed on the caseboard. Review it, then accept the final verdict.'
+            state.verdict === 'INSUFFICIENT' ? 'ABSTAIN' : 'NEEDS APPROVAL',
+            'Agent analysis complete. Your decision is required. Evidence is ready on the caseboard.'
           )
         } else {
           els.reviewStatusDetail.textContent = event.summary
         }
       } else if (event.phase === 'refused' || event.phase === 'failed' || event.phase === 'aborted') {
-        setReviewStatus(`AGENT CALL ${event.phase.toUpperCase()}`, event.summary)
+        const status = event.phase === 'refused' ? 'DENIED' : event.phase === 'aborted' ? 'CANCELLED' : 'FAILED'
+        setReviewStatus(status, event.summary)
       }
     }
   }
@@ -778,7 +925,15 @@ async function bootInner(): Promise<void> {
 // --- wiring -----------------------------------------------------------------
 
 els.copyBtn.addEventListener('click', () => void copyJudgePrompt())
-els.acceptVerdictBtn.addEventListener('click', acceptVerdict)
+els.approveVerdictBtn.addEventListener('click', approveVerdict)
+els.correctVerdictBtn.addEventListener('click', openCorrection)
+els.declineVerdictBtn.addEventListener('click', declineVerdict)
+els.correctionForm.addEventListener('submit', submitCorrection)
+els.cancelCorrectionBtn.addEventListener('click', () => {
+  els.correctionForm.hidden = true
+  els.correctionError.textContent = ''
+  setReviewStatus('CANCELLED', 'Correction entry cancelled. The agent proposal still needs a human decision.')
+})
 els.sealBtn.addEventListener('click', () => void sealReceipt())
 els.downloadBtn.addEventListener('click', downloadReceipt)
 els.verifyReceiptBtn.addEventListener('click', () => void verifyLastReceipt())
