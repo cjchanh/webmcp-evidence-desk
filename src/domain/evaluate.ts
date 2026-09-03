@@ -21,6 +21,33 @@ import type { ClaimEvaluation, ClaimReason, Exhibit, Span } from './types.ts'
 // "0000-01-01" via substring match — cycle-2 fuzz finding).
 const ISO_DATE = /(?<!\d)\d{4}-\d{2}-\d{2}(?!\d)/
 
+/** Calendar sanity: month 01-12, day 01-31. "2026-99-99" is not a date and
+ *  must never anchor a confident verdict. */
+function isValidIsoDate(s: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!m) return false
+  const month = Number(m[2])
+  const day = Number(m[3])
+  return month >= 1 && month <= 12 && day >= 1 && day <= 31
+}
+
+/**
+ * Same-sentence date anchors. [^.\n] forbids crossing a sentence boundary, so
+ * a register date, release date, or any unrelated date in a LATER sentence can
+ * never anchor the match — the date must belong to the sentence that carries
+ * the keyword. No max-date fallback exists anywhere: a missing anchor date is
+ * an abstention (INSUFFICIENT), never a guess.
+ *
+ * The acceptance anchor requires the acceptance EVENT: the verb "accepted",
+ * or the noun "acceptance" immediately followed by date/dated/on. A noun
+ * phrase like "acceptance register on 2026-03-16" is a record-keeping date,
+ * not the acceptance date, and must not anchor the comparison.
+ */
+const ACCEPTANCE_ANCHOR_RE =
+  /(?:accept(?:ed)\b[^.\n]{0,80}?|acceptance\s+(?:date|dated|on)\b[^.\n]{0,40}?)\d{4}-\d{2}-\d{2}/i
+const PERFORMED_RE = /(?:performed|conducted|inspected|completed|done)\b[^.\n]{0,80}?\d{4}-\d{2}-\d{2}/i
+const ATTESTATION_RE = /inspection\b[^.\n]{0,120}?\bcompleted\b[^.\n]{0,40}?\d{4}-\d{2}-\d{2}/i
+
 type Role = 'attestation' | 'inspection_report' | 'acceptance' | 'other'
 
 interface DateHit {
@@ -36,30 +63,23 @@ function roleOf(exhibit: Exhibit): Role {
   return 'other'
 }
 
-/** Find the first ISO date within spans whose text matches `pattern`. */
+/**
+ * Find the first calendar-valid ISO date within spans whose text matches
+ * `pattern`. Patterns are same-sentence ([^.\n]) so a date in a LATER sentence
+ * (a register date, a release date) can never anchor the match — the date must
+ * belong to the sentence that carries the keyword.
+ */
 function findDatedSpan(exhibit: Exhibit, pattern: RegExp): DateHit | null {
   for (const span of exhibit.spans) {
     const m = pattern.exec(span.text)
     if (m) {
       const date = ISO_DATE.exec(m[0])
-      if (date) {
+      if (date && isValidIsoDate(date[0])) {
         return { date: date[0], span }
       }
     }
   }
   return null
-}
-
-function maxIsoDateInSpans(exhibit: Exhibit): DateHit | null {
-  let best: DateHit | null = null
-  for (const span of exhibit.spans) {
-    for (const m of span.text.matchAll(new RegExp(ISO_DATE, 'g'))) {
-      if (!best || m[0] > best.date) {
-        best = { date: m[0], span }
-      }
-    }
-  }
-  return best
 }
 
 /**
@@ -150,11 +170,11 @@ export function evaluateClaim(
   }
 
   const attestation = byRole.get('attestation')?.[0]
-  const report = byRole.get('inspection_report')?.[0]
+  const reports = byRole.get('inspection_report') ?? []
   const acceptanceCert = byRole.get('acceptance')?.[0]
 
   // Nothing relevant at all → abstain naming what an adjudicator would need.
-  if (!acceptanceCert && !report && !attestation) {
+  if (!acceptanceCert && reports.length === 0 && !attestation) {
     const missing =
       implicatedDocTypes.size > 0
         ? [...implicatedDocTypes]
@@ -169,14 +189,14 @@ export function evaluateClaim(
       reasons: [],
       missing: dedupe([
         'acceptance certificate',
-        ...(report ? [] : ['independent inspection report']),
+        ...(reports.length > 0 ? [] : ['independent inspection report']),
         ...implicatedDocTypes
       ])
     }
   }
-  const acceptanceHit =
-    findDatedSpan(acceptanceCert, /accept(?:ed|ance)[^\n]{0,80}?\d{4}-\d{2}-\d{2}/i) ??
-    maxIsoDateInSpans(acceptanceCert)
+  // The acceptance anchor must be a date in the SAME sentence as an
+  // acceptance verb — never a register/record date elsewhere in the cert.
+  const acceptanceHit = findDatedSpan(acceptanceCert, ACCEPTANCE_ANCHOR_RE)
   if (!acceptanceHit) {
     return {
       verdict: 'INSUFFICIENT',
@@ -185,14 +205,16 @@ export function evaluateClaim(
     }
   }
 
-  // Actual inspection report drives the verdict when present.
-  if (report) {
-    const performedHit =
-      findDatedSpan(
-        report,
-        /(?:performed|conducted|inspected|completed)[^\n]{0,80}?\d{4}-\d{2}-\d{2}/i
-      ) ?? maxIsoDateInSpans(report)
-    if (!performedHit) {
+  // Actual inspection reports drive the verdict. EVERY report is adjudicated:
+  // a revision dated after acceptance contradicts the claim even when an
+  // earlier report predates it — the record contains a report showing the
+  // inspection happened after acceptance.
+  if (reports.length > 0) {
+    const dated = reports.flatMap((r) => {
+      const hit = findDatedSpan(r, PERFORMED_RE)
+      return hit ? [{ report: r, hit }] : []
+    })
+    if (dated.length === 0) {
       return {
         verdict: 'INSUFFICIENT',
         reasons: [],
@@ -200,16 +222,15 @@ export function evaluateClaim(
       }
     }
 
-    if (performedHit.date > acceptanceHit.date) {
-      const reasons: ClaimReason[] = [
-        {
-          verdict_basis: `inspection report is dated ${performedHit.date}, AFTER the acceptance date ${acceptanceHit.date}; the required report was not provided before acceptance`,
-          span_id: performedHit.span.span_id,
-          exhibit_id: report.id
-        }
-      ]
+    const after = dated.filter((d) => d.hit.date > acceptanceHit.date)
+    if (after.length > 0) {
+      const reasons: ClaimReason[] = after.map((d) => ({
+        verdict_basis: `inspection report is dated ${d.hit.date}, AFTER the acceptance date ${acceptanceHit.date}; the required report was not provided before acceptance`,
+        span_id: d.hit.span.span_id,
+        exhibit_id: d.report.id
+      }))
       const asserted = attestation
-        ? findDatedSpan(attestation, /inspection\b[^.\n]{0,120}?\bcompleted\b[^.\n]{0,40}?\d{4}-\d{2}-\d{2}/i)
+        ? findDatedSpan(attestation, ATTESTATION_RE)
         : null
       if (attestation && asserted && asserted.date <= acceptanceHit.date) {
         reasons.push({
@@ -221,13 +242,14 @@ export function evaluateClaim(
       return { verdict: 'CONTRADICTED', reasons, missing: [] }
     }
 
+    const latest = dated.reduce((a, b) => (b.hit.date > a.hit.date ? b : a))
     return {
       verdict: 'SUPPORTED',
       reasons: [
         {
-          verdict_basis: `inspection report is dated ${performedHit.date}, on or before the acceptance date ${acceptanceHit.date}`,
-          span_id: performedHit.span.span_id,
-          exhibit_id: report.id
+          verdict_basis: `inspection report is dated ${latest.hit.date}, on or before the acceptance date ${acceptanceHit.date}`,
+          span_id: latest.hit.span.span_id,
+          exhibit_id: latest.report.id
         }
       ],
       missing: []

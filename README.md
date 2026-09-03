@@ -25,7 +25,7 @@ An agent with WebMCP tools investigates the packet through the page itself:
 3. **Evaluates** the claim deterministically, returning `CONTRADICTED` with span-tied reasons for both sides (`evaluate_claim`)
 4. **Proposes** evidence to a shared caseboard (`update_caseboard`)
 
-Every real tool call lands in a live provenance rail as it runs — including refusals and aborts. Then the agent stops. Pin, reject, correct, decline, approve, and seal are **human-exclusive controls**, enforced in the domain layer, not just the UI. No tool-produced verdict can be sealed until a person explicitly accepts it.
+Every real tool call lands in a live provenance rail as it runs — including refusals and aborts. Then the agent stops. Pin, reject, correct, decline, approve, and seal are **human-exclusive controls**: the tool contract is add-only (enforced in the tool schema and domain logic), and no tool-produced verdict can be sealed until a person explicitly accepts it.
 
 The result is a sealed, locally-signed receipt that records what the agent proposed, what the human decided, and which evidence both sides touched — with the human-readable summary ahead of the raw signed JSON.
 
@@ -78,7 +78,7 @@ npm install
 npm run build:manifest   # signs the exhibit manifest; private key -> gitignored keys/
 npm run dev              # local dev server
 
-npm test                 # vitest suite (145 tests)
+npm test                 # vitest suite (168 tests)
 npm run build            # production build -> dist/
 npm run typecheck        # tsc --noEmit
 ```

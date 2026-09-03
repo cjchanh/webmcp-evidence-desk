@@ -124,6 +124,156 @@ describe('evaluateClaim — verdict correctness', () => {
   it('rejects empty claims', () => {
     expect(() => evaluateClaim('', fixtureExhibits())).toThrow(TypeError)
   })
+
+  it('F1: acceptance anchor never falls back to a register date in another sentence', () => {
+    const exhibits = [
+      {
+        id: 'EX-A',
+        title: 'Acceptance Certificate AC-1',
+        spans: [
+          { span_id: 'EX-A-1', text: 'The customer accepted Lot HX-17 into service following receiving verification at Dock 4.', sha256: 'x' },
+          { span_id: 'EX-A-2', text: 'Certificate recorded in the acceptance register on 2026-03-16.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-B',
+        title: 'Inspection Report IR-1',
+        spans: [
+          { span_id: 'EX-B-1', text: 'All checks were performed on 2026-03-15 at the facility.', sha256: 'x' }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    // No date in the "accepted" sentence -> abstain, never anchor on 03-16.
+    expect(evaluation.verdict).toBe('INSUFFICIENT')
+    expect(evaluation.missing).toContain('dated acceptance certificate')
+  })
+
+  it('F2: report anchor never falls back to a release date in another sentence', () => {
+    const exhibits = [
+      {
+        id: 'EX-C',
+        title: 'Acceptance Certificate AC-2',
+        spans: [
+          { span_id: 'EX-C-1', text: 'The customer accepted Lot HX-17 into service on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-D',
+        title: 'Inspection Report IR-2',
+        spans: [
+          { span_id: 'EX-D-1', text: 'All electrical continuity checks were performed at the Meridian Fab 2 facility.', sha256: 'x' },
+          { span_id: 'EX-D-2', text: 'Report approved and released by Quality Manager on 2026-03-20.', sha256: 'x' }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    // No date in the "performed" sentence -> abstain, never anchor on 03-20.
+    expect(evaluation.verdict).toBe('INSUFFICIENT')
+    expect(evaluation.missing).toContain('dated inspection report')
+  })
+
+  it('F3: a revised report dated after acceptance contradicts even when an earlier report predates it', () => {
+    const exhibits = [
+      {
+        id: 'EX-E',
+        title: 'Acceptance Certificate AC-3',
+        spans: [
+          { span_id: 'EX-E-1', text: 'The customer accepted Lot HX-17 into service on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-F',
+        title: 'Inspection Report IR-3',
+        spans: [
+          { span_id: 'EX-F-1', text: 'All checks were performed on 2026-03-10 at the facility.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-G',
+        title: 'Inspection Report IR-4 REV B',
+        spans: [
+          { span_id: 'EX-G-1', text: 'Revised inspection record: all checks were performed on 2026-03-19 at the facility.', sha256: 'x' }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('CONTRADICTED')
+    const bases = evaluation.reasons.map((r) => r.verdict_basis)
+    expect(bases.some((b) => b.includes('2026-03-19') && b.includes('AFTER'))).toBe(true)
+    expect(evaluation.reasons.some((r) => r.exhibit_id === 'EX-G')).toBe(true)
+  })
+
+  it('multiple reports all predating acceptance -> SUPPORTED on the latest', () => {
+    const exhibits = [
+      {
+        id: 'EX-H',
+        title: 'Acceptance Certificate AC-4',
+        spans: [
+          { span_id: 'EX-H-1', text: 'The customer accepted Lot HX-17 into service on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-I',
+        title: 'Inspection Report IR-5',
+        spans: [
+          { span_id: 'EX-I-1', text: 'All checks were performed on 2026-03-10 at the facility.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-J',
+        title: 'Inspection Report IR-6',
+        spans: [
+          { span_id: 'EX-J-1', text: 'All checks were performed on 2026-03-12 at the facility.', sha256: 'x' }
+        ]
+      }
+    ]
+    const evaluation = evaluateClaim(HERO_CLAIM, exhibits)
+    expect(evaluation.verdict).toBe('SUPPORTED')
+    expect(evaluation.reasons[0]?.verdict_basis).toContain('2026-03-12')
+  })
+
+  it('calendar-invalid dates never anchor a confident verdict', () => {
+    const badAcceptance = [
+      {
+        id: 'EX-K',
+        title: 'Acceptance Certificate AC-5',
+        spans: [
+          { span_id: 'EX-K-1', text: 'The customer accepted Lot HX-17 into service on 2026-99-99.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-L',
+        title: 'Inspection Report IR-7',
+        spans: [
+          { span_id: 'EX-L-1', text: 'All checks were performed on 2026-03-19 at the facility.', sha256: 'x' }
+        ]
+      }
+    ]
+    const badAcceptanceEval = evaluateClaim(HERO_CLAIM, badAcceptance)
+    expect(badAcceptanceEval.verdict).toBe('INSUFFICIENT')
+    expect(badAcceptanceEval.missing).toContain('dated acceptance certificate')
+
+    const badReport = [
+      {
+        id: 'EX-M',
+        title: 'Acceptance Certificate AC-6',
+        spans: [
+          { span_id: 'EX-M-1', text: 'The customer accepted Lot HX-17 into service on 2026-03-14.', sha256: 'x' }
+        ]
+      },
+      {
+        id: 'EX-N',
+        title: 'Inspection Report IR-8',
+        spans: [
+          { span_id: 'EX-N-1', text: 'All checks were performed on 2026-99-99 at the facility.', sha256: 'x' }
+        ]
+      }
+    ]
+    const badReportEval = evaluateClaim(HERO_CLAIM, badReport)
+    expect(badReportEval.verdict).toBe('INSUFFICIENT')
+    expect(badReportEval.missing).toContain('dated inspection report')
+  })
 })
 
 describe('board ops — agentAddOnly enforcement', () => {

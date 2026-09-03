@@ -26,11 +26,33 @@ export async function verifyManifest(
 ): Promise<VerificationReport> {
   throwIfAborted(opts?.signal)
 
+  // Fail-closed shape gate: a malformed manifest must report nothing verified
+  // and never throw mid-verification (defense-in-depth — the shipped import
+  // path shape-validates first, but verifyManifest is a public domain entry).
+  const rawExhibits = (manifest as { exhibits?: unknown } | null)?.exhibits
+  if (!manifest || typeof manifest !== 'object' || !Array.isArray(rawExhibits)) {
+    return { ok: false, manifestSignatureValid: false, verified: [], quarantined: [] }
+  }
+  const exhibits = rawExhibits as EvidenceManifest['exhibits']
+  if (
+    exhibits.some(
+      (e) =>
+        !e ||
+        typeof e !== 'object' ||
+        !Array.isArray(e.spans) ||
+        e.spans.some(
+          (s) => !s || typeof s !== 'object' || typeof s.text !== 'string' || typeof s.sha256 !== 'string'
+        )
+    )
+  ) {
+    return { ok: false, manifestSignatureValid: false, verified: [], quarantined: [] }
+  }
+
   const allQuarantined = (reason: string): VerificationReport => ({
     ok: false,
     manifestSignatureValid: false,
     verified: [],
-    quarantined: manifest.exhibits.map((e) => ({
+    quarantined: exhibits.map((e) => ({
       exhibit_id: e.id,
       title: e.title,
       reason
@@ -54,7 +76,7 @@ export async function verifyManifest(
     return allQuarantined('unsupported manifest format or algorithm')
   }
 
-  const payload = manifestSigningPayload(manifest.exhibits)
+  const payload = manifestSigningPayload(exhibits)
   // Defense-in-depth: a crypto-library throw must degrade to quarantine-all,
   // never crash boot into an unverified-accepting state.
   let signatureValid = false
@@ -74,11 +96,11 @@ export async function verifyManifest(
   // large corpus scale while keeping identical semantics and abort granularity.
   // Results are written back by original index — output order matches manifest.
   const CHUNK = 64
-  const intactFlags = new Array<boolean>(manifest.exhibits.length).fill(true)
-  const failReasons = new Array<string>(manifest.exhibits.length).fill('')
-  for (let start = 0; start < manifest.exhibits.length; start += CHUNK) {
+  const intactFlags = new Array<boolean>(exhibits.length).fill(true)
+  const failReasons = new Array<string>(exhibits.length).fill('')
+  for (let start = 0; start < exhibits.length; start += CHUNK) {
     throwIfAborted(opts?.signal)
-    const chunk = manifest.exhibits.slice(start, start + CHUNK)
+    const chunk = exhibits.slice(start, start + CHUNK)
     await Promise.all(
       chunk.map(async (exhibit, offset) => {
         const idx = start + offset
@@ -93,7 +115,7 @@ export async function verifyManifest(
       })
     )
   }
-  manifest.exhibits.forEach((exhibit, idx) => {
+  exhibits.forEach((exhibit, idx) => {
     if (intactFlags[idx]) {
       verified.push(exhibit)
     } else {
