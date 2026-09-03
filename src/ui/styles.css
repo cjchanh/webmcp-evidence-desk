@@ -984,6 +984,9 @@ button.big {
   font-size: 0.75rem;
 }
 
+.footer a { color: inherit; text-decoration: underline; text-underline-offset: 0.15em; }
+.footer a:hover { color: var(--accent-deep); }
+
 .sim-ribbon {
   position: fixed;
   left: 0;
