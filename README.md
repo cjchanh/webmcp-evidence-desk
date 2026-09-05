@@ -2,7 +2,7 @@
 
 **Agent investigation. Human judgment. Durable proof.**
 
-A judge-first [WebMCP Challenge](https://openai.com/webmcp-challenge/) entry from [Centennial Defense Systems](https://centennialdefense.systems).
+A judge-first [WebMCP Challenge](https://openai.com/webmcp-challenge/) entry from [Centennial Defense Systems](https://centennialsystems.com).
 
 Evidence Desk is a working answer to the hardest problem in agentic AI: how does a person verify what an agent actually did before acting on its conclusion? Instead of hiding agent reasoning behind a chat transcript, Evidence Desk puts the whole investigation on one auditable page — the agent searches, inspects, and evaluates signed evidence in the open, then stops. The human adjudicates. A tamper-evident receipt preserves both sides of that decision.
 
@@ -134,4 +134,4 @@ Apache-2.0 — see [LICENSE](LICENSE). Signing dependency `@noble/curves` is MIT
 
 ---
 
-*Built by [Centennial Defense Systems](https://centennialdefense.systems) — deterministic, audit-first systems.*
+*Built by [Centennial Defense Systems](https://centennialsystems.com) — deterministic, audit-first systems.*

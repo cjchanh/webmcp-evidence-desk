@@ -22,7 +22,7 @@ Campaign outcome: repo public, live URL, BYOE panel, real domain, video, Devpost
 ### 1. Push (operator-gated — bash push is DENIED on this surface)
 Hand CJ this exact line, he runs it:
 ```
-cd /Users/cj/Staging/webmcp-evidence-desk-20260825 && git push origin HEAD:main
+cd <local checkout> && git push origin HEAD:main
 ```
 After push: verify GitHub main = `cee3300` (curl https://api.github.com/repos/cjchanh/webmcp-evidence-desk/commits/main | grep sha).
 
@@ -59,7 +59,7 @@ NOTE: a task space named "webmcp ev..." (id 5) already exists. Earlier attempts 
 **BYOE canary (new, not yet run live):** paste 2-exhibit corpus in the user-evidence textarea → SIGN → SIGNED LOCALLY → evaluate → CONTRADICTED → human pin/approve → seal receipt verifies against USER manifest (not shipped manifest). Also: SAVE writes JSON packet; import of a tampered packet → LOAD REFUSED.
 
 ### 3. Video (75s, operator records)
-Storyboard ready: /Users/cj/.config/opencode/benchmarks/ox-flow/runs/20260903T094052Z-2e307ce2/harvested.json (beats 0:00–1:15: WEBMCP ACTIVE badge → INVESTIGATE WITH MY AGENT → 4 tool calls in rail → MAR 14 ≠ MAR 19 → CONTRADICTED → pin + APPROVE AGENT VERDICT → SEAL RECEIPT → Forgery Bench tamper SIG FAILED → end card evidence.centennialdefense.systems + github.com/cjchanh/webmcp-evidence-desk). Operator narrates; screen-record in a WebMCP-capable browser (ego-browser or Chrome with WebMCP flag). Upload to YouTube unlisted or direct file for Devpost.
+Storyboard ready: internal ox-flow harvest, run 20260903T094052Z-2e307ce2 (beats 0:00–1:15: WEBMCP ACTIVE badge → INVESTIGATE WITH MY AGENT → 4 tool calls in rail → MAR 14 ≠ MAR 19 → CONTRADICTED → pin + APPROVE AGENT VERDICT → SEAL RECEIPT → Forgery Bench tamper SIG FAILED → end card evidence.centennialdefense.systems + github.com/cjchanh/webmcp-evidence-desk). Operator narrates; screen-record in a WebMCP-capable browser (ego-browser or Chrome with WebMCP flag). Upload to YouTube unlisted or direct file for Devpost.
 
 ### 4. Devpost submission (operator)
 Staged copy: docs/SUBMISSION_PACKAGE.md in the repo. Requires: repo URL, live URL (use https://evidence.centennialdefense.systems), video URL, team info. CJ owns the Devpost account.
@@ -73,7 +73,7 @@ Staged copy: docs/SUBMISSION_PACKAGE.md in the repo. Requires: repo URL, live UR
 - **DO NOT run `node scripts/build-manifest.mts`** — it regenerates the shipped keypair (f88a3503…) and dirties public/evidence/manifest.json + src/generated/manifest.ts. If run: `git checkout -- public/evidence/manifest.json src/generated/manifest.ts`.
 - **MCP auth decision: NO** — challenge requires no-login judge path. Security story = headers + signed manifests + human-only seal. Post-challenge maybe.
 - **ego-browser is WebMCP-capable** (document.modelContext works). Tools take JSON-string inputs.
-- **ox_flow dispatch** requires `--parent-session ses_f9978951cfferP9ghnBGvWRRk5`. Harvests: /Users/cj/.config/opencode/benchmarks/ox-flow/runs/<run_id>/harvested.json. Before every operator reply: `ox_flow.py drain; ox_flow.py status --cue` — first line of reply is the cue (OUT: 0 or OUT: N running).
+- **ox_flow dispatch** requires `--parent-session <parent session id>`. Harvests: `<internal ox-flow harvest dir>/<run_id>/harvested.json`. Before every operator reply: `ox_flow.py drain; ox_flow.py status --cue` — first line of reply is the cue (OUT: 0 or OUT: N running).
 - **Worker fleet:** ox-builder-a (build), ox-critic-a (red-team), ox-repo-scout (read slices) — quota-metered, no USD. All idle now.
 - **Test count history:** 145 (ship) → 161 (BYOE, after concurrent-builder merge dedup). 161 is correct and current; earlier "164" was a transient concurrent-write artifact, not a regression.
 
