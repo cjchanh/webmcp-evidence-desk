@@ -1,14 +1,20 @@
 # Evidence Desk
 
-**Agent investigation. Human judgment. Durable proof.**
+A page where an agent searches signed exhibits and a person keeps the verdict. [WebMCP Challenge](https://openai.com/webmcp-challenge/) entry from [Centennial Defense Systems](https://centennialsystems.com).
 
-A judge-first [WebMCP Challenge](https://openai.com/webmcp-challenge/) entry from [Centennial Defense Systems](https://centennialsystems.com).
+```bash
+npm install
+npm run build:manifest
+npm run dev
+```
 
-Evidence Desk is a working answer to the hardest problem in agentic AI: how does a person verify what an agent actually did before acting on its conclusion? Instead of hiding agent reasoning behind a chat transcript, Evidence Desk puts the whole investigation on one auditable page — the agent searches, inspects, and evaluates signed evidence in the open, then stops. The human adjudicates. A tamper-evident receipt preserves both sides of that decision.
+Open the app, run **INVESTIGATE WITH MY AGENT**, then **APPROVE** and **SEAL**. The agent cannot seal a verdict.
 
-> **Agent proposes. Human decides. Evidence preserves what happened.**
+**Refuses:** no runtime network; does not seal without an explicit human accept; does not treat a forged exhibit as evidence.
 
 **Live demo:** https://evidence.centennialdefense.systems · https://webmcp-evidence-desk.vercel.app
+
+Background: [docs/WHY.md](docs/WHY.md). Trust model: [docs/TRUST.md](docs/TRUST.md).
 
 ---
 
@@ -27,11 +33,7 @@ An agent with WebMCP tools investigates the packet through the page itself:
 
 Every real tool call lands in a live provenance rail as it runs — including refusals and aborts. Then the agent stops. Pin, reject, correct, decline, approve, and seal are **human-exclusive controls**: the tool contract is add-only (enforced in the tool schema and domain logic), and no tool-produced verdict can be sealed until a person explicitly accepts it.
 
-The result is a sealed, locally-signed receipt that records what the agent proposed, what the human decided, and which evidence both sides touched — with the human-readable summary ahead of the raw signed JSON.
-
-## Why it matters
-
-High-stakes decisions force a bad choice: make a person read every document, or let an agent act and trust an opaque summary. Evidence Desk is a third path — the agent does the reading, the person keeps the verdict, and the receipt makes the whole exchange auditable after the fact. The pattern generalizes to legal, procurement, compliance, and anywhere an agent's conclusion needs to survive scrutiny.
+The result is a sealed, locally-signed record of what the agent proposed, what the person decided, and which evidence both sides touched — with the human-readable summary ahead of the raw signed JSON.
 
 ## The four tools (frozen contract)
 
@@ -57,16 +59,6 @@ await document.modelContext.registerTool({
 
 All four tools are registered in `src/webmcp/register.ts` with per-tool error isolation, abort-signal threading, and bounded outputs. Registration is progressive enhancement: when `document.modelContext` is absent, the page degrades gracefully to a labeled simulated review — never presented as WebMCP proof.
 
-## Trust boundary — honest claims
-
-- **Tamper-evident, not tamper-proof.** The manifest is Ed25519-signed at build time; runtime verifies the signature and recomputes every span sha256 client-side. A tampered exhibit is quarantined (`SIG FAILED`) and the verdict is forced to `INSUFFICIENT`. This raises the cost of silent tampering; it does not eliminate it.
-- **Receipts are not authoritative legal signatures.** The build-time signing key never ships; sealed receipts are signed by an ephemeral local keypair chained to the manifest's public key.
-- **Zero network egress at runtime.** No backend, no fetches; the signed manifest is bundled at build time.
-- **Unsupported claims abstain.** `evaluate_claim` returns `INSUFFICIENT` naming the missing document type rather than guessing.
-- **All agent-visible evidence text is untrusted.** Rendering is text-only (`textContent`, never `innerHTML`), outputs are length-bounded, and `untrustedContentHint` is set where the API supports it.
-- **The simulated agent is labeled.** `SIMULATED AGENT` ribbon + `[SIM]` log tags; it is never claimed as WebMCP proof.
-- **The final decision stays human.** A tool-produced verdict cannot be sealed until the person explicitly accepts it. Any later board change invalidates that acceptance.
-
 ## Adversarial proof: the Forgery Bench
 
 After the primary flow, open the Forgery Bench, edit one signed span, and submit the forgery. The manifest comparison catches the changed bytes, quarantines the exhibit, forces the verdict to `INSUFFICIENT`, and refuses the seal — fail closed, visibly, in one click.
@@ -83,7 +75,7 @@ npm run build            # production build -> dist/
 npm run typecheck        # tsc --noEmit
 ```
 
-Requires Node 22.18+ (native TypeScript type-stripping runs `scripts/build-manifest.mts`).
+Requires Node 20+ (`engines.node`, tests, and `tsc`). `npm run build:manifest` runs `node scripts/build-manifest.mts` and needs Node 22.18+ for native TypeScript execution.
 
 ## Architecture
 
@@ -92,11 +84,11 @@ scripts/build-manifest.mts   build-time Ed25519 signing (@noble/curves);
                              private key written ONLY to .gitignored keys/
 src/domain/                  pure functions: searchExhibits, inspectExhibit,
                              evaluateClaim, board ops (agent add-only),
-                             verifyManifest, sealed receipts. No DOM access.
+                              verifyManifest, sealed records. No DOM access.
 src/webmcp/                  registration layer; progressive enhancement only;
                              4 tools on document.modelContext when present
 src/ui/                      judge-first caseboard, live tool-call lifecycle,
-                             human decision boundary, readable receipt summary
+                             human decision boundary, readable record summary
 src/simulated/               SIMULATED AGENT ribbon + [SIM] tags driving the
                              identical domain functions
 corpus/exhibits/             13 synthetic exhibits (source of truth)

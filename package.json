@@ -1,7 +1,7 @@
 {
   "name": "webmcp-evidence-desk",
   "version": "0.1.0",
-  "description": "Evidence Desk - AI receipts for claims that matter. WebMCP tools over a signed synthetic vendor handoff packet.",
+  "description": "Evidence Desk — a person verifies what an agent did before acting. WebMCP tools over a signed synthetic vendor handoff packet.",
   "type": "module",
   "license": "Apache-2.0",
   "private": true,
