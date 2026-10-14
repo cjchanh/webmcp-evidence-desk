@@ -1,0 +1,68 @@
+{
+  "repo_notes": [
+    {
+      "content": "webmcp-evidence-desk is 'Evidence Desk', a WebMCP Challenge entry by Centennial Defense Systems: a Vite+TypeScript page where an agent investigates a packet of 13 Ed25519-signed synthetic exhibits through four in-page tools, while a human keeps exclusive control of the verdict. Core invariants: the tool contract is add-only (agents can search/inspect/evaluate/propose but never pin, reject, approve or seal — those are human-exclusive and enforced in both tool schema and domain logic); the runtime makes zero network calls (the signed manifest ships as src/generated/manifest.ts); a forged exhibit is detected by manifest hash comparison, quarantined, forces INSUFFICIENT and refuses the seal — fail closed. The contested claim is deliberately CONTRADICTED: a vendor attestation claims inspection preceded acceptance while the signed inspection report is dated after it.",
+      "author": "Devin"
+    },
+    {
+      "content": "Layout: src/domain/ holds pure functions with no DOM access — search.ts, inspect.ts, evaluate.ts, board.ts (add-only caseboard ops), verify.ts (manifest verification), receipt.ts (sealed records), decision.ts, forge.ts, exhibitParse.ts, manifestPayload.ts, userManifest.ts, hex.ts, errors.ts, types.ts. src/webmcp/register.ts registers the four frozen tools (search_evidence, inspect_exhibit, evaluate_claim, update_caseboard) on document.modelContext with per-tool error isolation, abort threading and <=1500-char JSON outputs; absent modelContext it degrades to a labeled simulated review. src/simulated/runSimulatedAgent.ts drives the same domain functions under a SIMULATED AGENT ribbon and [SIM] tags. src/ui/ is the judge-first caseboard, live tool-call provenance rail and human decision boundary (caseboard.ts, timeline.ts, dom.ts, styles.css). scripts/build-manifest.mts signs the exhibit manifest at build with @noble/curves Ed25519, writing the private key only to gitignored keys/. corpus/exhibits/EX-001..EX-013.txt is the source of truth; public/evidence/manifest.json and src/generated/manifest.ts are build outputs. tests/ is a ~189-test vitest suite. First-class docs: README.md (very complete), docs/WHY.md, docs/TRUST.md, docs/HARDENING_LEDGER.md, docs/SUBMISSION_PACKAGE.md, PASSDOWN.md.",
+      "author": "Devin"
+    },
+    {
+      "content": "Vocabulary: exhibit, span, manifest hash, caseboard, verdict (SUPPORTED|CONTRADICTED|INSUFFICIENT), provenance rail (live lifecycle events: started then completed/refused/failed/aborted), seal (human-only final accept producing a locally signed record), Forgery Bench (interactive tamper demo), untrustedContentHint (annotation on corpus-derived tool text), originAgentCluster (runtime origin check complementing public/_headers), WebMCP / document.modelContext.registerTool (Chrome 149+ behind a flag). Deployment is static: vercel.json plus public/_headers carry the security-header contract. De-emphasize generated files and lockfile.",
+      "author": "Devin"
+    }
+  ],
+  "pages": [
+    {
+      "title": "Overview",
+      "purpose": "Introduce Evidence Desk: the WebMCP Challenge premise (agent investigates a signed exhibit packet in-page, human keeps the verdict), the deliberately CONTRADICTED contested claim, the demo flow (INVESTIGATE -> APPROVE -> SEAL), and what the app refuses to do (runtime network, agent sealing, forged evidence).",
+      "parent": null
+    },
+    {
+      "title": "Getting Started",
+      "purpose": "Document npm install, npm run build:manifest (scripts/build-manifest.mts; Node 22.18+ for native TS, key -> gitignored keys/), npm run dev, npm test, npm run build, npm run typecheck; the live demo URLs; WebMCP requires Chrome 149+ with the enable-webmcp-testing flag; deploy via vercel.json + public/_headers from repo root.",
+      "parent": "Overview"
+    },
+    {
+      "title": "The Four-Tool Contract",
+      "purpose": "Document the frozen tool contract registered in src/webmcp/register.ts: search_evidence, inspect_exhibit, evaluate_claim, update_caseboard — input/output schemas, add-only restriction, <=1500-char bounded JSON outputs, untrustedContentHint, per-tool error isolation, abort-signal threading, and the started/completed|refused|failed|aborted lifecycle events.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Human-Exclusive Decision Boundary",
+      "purpose": "Explain which controls are human-only (pin, reject, correct, decline, approve, seal), how that boundary is enforced in the domain board ops and tool schema rather than by convention, and how the sealed record (src/domain/receipt.ts, decision.ts) assembles what the agent proposed, what the person decided, and which evidence both sides touched.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Signed Manifest and Zero-Network Runtime",
+      "purpose": "Cover the build-time Ed25519 signing flow (scripts/build-manifest.mts, @noble/curves), corpus/exhibits as the source of truth, the dual manifest outputs (public/evidence/manifest.json and importable src/generated/manifest.ts), manifest hash verification in src/domain/verify.ts and manifestPayload.ts, and why the runtime makes zero network calls.",
+      "parent": "Overview"
+    },
+    {
+      "title": "Domain Layer",
+      "purpose": "Walk src/domain/ module by module: search/inspect/evaluate pipeline returning span-tied reasons and verdicts, board.ts add-only operations, forge.ts forgery handling, exhibitParse.ts, userManifest.ts, hex.ts, errors.ts and types.ts — emphasizing purity (no DOM, deterministic, bounded outputs).",
+      "parent": null
+    },
+    {
+      "title": "WebMCP Registration and Simulated Agent",
+      "purpose": "Document src/webmcp/register.ts progressive enhancement (document.modelContext presence detection, graceful degradation to labeled simulated review) and src/simulated/runSimulatedAgent.ts — the SIMULATED AGENT ribbon / [SIM] provenance tags driving identical domain functions for the 20-second guided replay fallback.",
+      "parent": null
+    },
+    {
+      "title": "UI: Caseboard, Provenance Rail and Forgery Bench",
+      "purpose": "Walk src/ui/ (caseboard.ts judge-first board, timeline.ts live provenance rail including refusals/aborts, dom.ts, styles.css) and index.html; cover the Forgery Bench flow (edit a signed span -> manifest mismatch -> quarantine -> INSUFFICIENT -> seal refused) as the adversarial proof.",
+      "parent": null
+    },
+    {
+      "title": "Testing and CI",
+      "purpose": "Document the vitest suite layout under tests/ (unit/, webmcp/ contract+live-page+invalid-input+provenance+real-execution, tamper/, abort/, purity/runtime-purity, unsupported/, hardening-cycle*.test.ts, ui-contract, shipped-manifest, hero-flow, judge-first-ui) and .github/workflows/ci.yml.",
+      "parent": null
+    },
+    {
+      "title": "Design and Trust Documents",
+      "purpose": "Index docs/WHY.md, docs/TRUST.md (trust model), docs/HARDENING_LEDGER.md (hardening cycles), docs/SUBMISSION_PACKAGE.md and docs/VIDEO_PLAN.md (challenge submission materials), and PASSDOWN.md — flagging which describe current behavior versus submission collateral.",
+      "parent": null
+    }
+  ]
+}
